@@ -1,3 +1,4 @@
+#[cfg(test)]
 pub fn parse_unread_from_title(title: &str) -> u32 {
     let trimmed = title.trim_start();
     let rest = match trimmed.strip_prefix('(') {

@@ -1,15 +1,9 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod title_parse;
 mod tray;
 mod settings;
 mod ipc;
 mod notify;
 mod windows;
-
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -34,6 +28,7 @@ pub fn run() {
             app.manage(crate::ipc::AppState {
                 settings: std::sync::Mutex::new(settings),
                 settings_path,
+                last_notification: std::sync::Mutex::new(None),
             });
             let tray_handle = crate::tray::build_tray(app)?;
             app.manage(tray_handle);
@@ -56,13 +51,11 @@ pub fn run() {
             .title("WhatsApp")
             .inner_size(1200.0, 800.0)
             .min_inner_size(600.0, 400.0)
-            .visible(false)
             .initialization_script(&inject_js)
             .build()?;
 
             let handle = app.handle().clone();
             crate::windows::install_close_to_tray(&handle);
-            crate::windows::show_main_on_startup(&handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

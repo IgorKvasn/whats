@@ -17,28 +17,6 @@ impl TrayState {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn no_unread_not_disconnected() {
-        assert_eq!(TrayState::derive(0, false), TrayState::Normal);
-    }
-
-    #[test]
-    fn unread_not_disconnected() {
-        assert_eq!(TrayState::derive(1, false), TrayState::Unread);
-        assert_eq!(TrayState::derive(42, false), TrayState::Unread);
-    }
-
-    #[test]
-    fn disconnected_beats_unread() {
-        assert_eq!(TrayState::derive(0, true), TrayState::Disconnected);
-        assert_eq!(TrayState::derive(5, true), TrayState::Disconnected);
-    }
-}
-
 use std::sync::Mutex;
 use tauri::image::Image;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
@@ -127,5 +105,27 @@ pub fn update(app: &AppHandle, unread_opt: Option<u32>, disc_opt: Option<bool>) 
             let _ = handle.icon.set_icon(Some(img));
         }
         *current = new_state;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_unread_not_disconnected() {
+        assert_eq!(TrayState::derive(0, false), TrayState::Normal);
+    }
+
+    #[test]
+    fn unread_not_disconnected() {
+        assert_eq!(TrayState::derive(1, false), TrayState::Unread);
+        assert_eq!(TrayState::derive(42, false), TrayState::Unread);
+    }
+
+    #[test]
+    fn disconnected_beats_unread() {
+        assert_eq!(TrayState::derive(0, true), TrayState::Disconnected);
+        assert_eq!(TrayState::derive(5, true), TrayState::Disconnected);
     }
 }
