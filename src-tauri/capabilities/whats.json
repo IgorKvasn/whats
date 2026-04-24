@@ -3,6 +3,7 @@
   "description": "Custom commands for the WhatsApp shell",
   "windows": ["main", "settings"],
   "permissions": [
+    "default",
     "core:default",
     "notification:default"
   ],
