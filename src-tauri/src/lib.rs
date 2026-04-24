@@ -3,6 +3,7 @@ mod title_parse;
 mod tray;
 mod settings;
 mod ipc;
+mod notify;
 
 #[tauri::command]
 fn greet(name: &str) -> String {

@@ -37,11 +37,11 @@ pub fn report_disconnected(_app: AppHandle, disconnected: bool) {
 
 #[tauri::command]
 pub fn notify_message(
-    _app: AppHandle,
-    _state: State<'_, AppState>,
+    app: AppHandle,
+    state: State<'_, AppState>,
     sender: String,
     body: Option<String>,
 ) {
-    // Wired up in Task 8.
-    let _ = (sender, body);
+    let settings = *state.settings.lock().unwrap();
+    crate::notify::dispatch(&app, settings, &sender, body.as_deref());
 }
