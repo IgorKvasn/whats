@@ -24,15 +24,13 @@ pub fn set_settings(
 }
 
 #[tauri::command]
-pub fn report_unread(_app: AppHandle, count: u32) {
-    // Wired up in Task 9.
-    let _ = count;
+pub fn report_unread(app: AppHandle, count: u32) {
+    crate::tray::update(&app, Some(count), None);
 }
 
 #[tauri::command]
-pub fn report_disconnected(_app: AppHandle, disconnected: bool) {
-    // Wired up in Task 9.
-    let _ = disconnected;
+pub fn report_disconnected(app: AppHandle, disconnected: bool) {
+    crate::tray::update(&app, None, Some(disconnected));
 }
 
 #[tauri::command]

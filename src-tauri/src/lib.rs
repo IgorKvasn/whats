@@ -34,6 +34,8 @@ pub fn run() {
                 settings: std::sync::Mutex::new(settings),
                 settings_path,
             });
+            let tray_handle = crate::tray::build_tray(app)?;
+            app.manage(tray_handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
