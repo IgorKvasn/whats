@@ -1,6 +1,9 @@
 (function () {
   'use strict';
 
+  // NOTE: parseUnread and notification shim mirror src-tauri/resources/inject.lib.js,
+  // which is the unit-tested source of truth. Keep them in sync.
+
   const tauri = window.__TAURI__;
   if (!tauri || !tauri.core || typeof tauri.core.invoke !== 'function') {
     console.warn('[whats] Tauri IPC not available; bridge disabled.');
