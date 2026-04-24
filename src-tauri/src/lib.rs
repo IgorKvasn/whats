@@ -37,6 +37,29 @@ pub fn run() {
             });
             let tray_handle = crate::tray::build_tray(app)?;
             app.manage(tray_handle);
+
+            let inject_path = app
+                .path()
+                .resource_dir()?
+                .join("resources/inject.js");
+            let inject_js = std::fs::read_to_string(&inject_path)
+                .unwrap_or_else(|e| {
+                    eprintln!("inject.js not found at {inject_path:?}: {e}");
+                    String::new()
+                });
+
+            let _main = tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::External("https://web.whatsapp.com/".parse().unwrap()),
+            )
+            .title("WhatsApp")
+            .inner_size(1200.0, 800.0)
+            .min_inner_size(600.0, 400.0)
+            .visible(false)
+            .initialization_script(&inject_js)
+            .build()?;
+
             let handle = app.handle().clone();
             crate::windows::install_close_to_tray(&handle);
             crate::windows::show_main_on_startup(&handle);
