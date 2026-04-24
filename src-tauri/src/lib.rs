@@ -4,6 +4,7 @@ mod tray;
 mod settings;
 mod ipc;
 mod notify;
+mod windows;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -36,6 +37,9 @@ pub fn run() {
             });
             let tray_handle = crate::tray::build_tray(app)?;
             app.manage(tray_handle);
+            let handle = app.handle().clone();
+            crate::windows::install_close_to_tray(&handle);
+            crate::windows::show_main_on_startup(&handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

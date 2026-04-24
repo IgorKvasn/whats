@@ -1,7 +1,7 @@
 use crate::settings::Settings;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
 pub struct AppState {
     pub settings: Mutex<Settings>,
