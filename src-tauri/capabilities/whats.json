@@ -1,11 +1,11 @@
 {
   "identifier": "whats-capability",
-  "description": "Custom commands for the WhatsApp shell",
+  "description": "Capability for the WhatsApp shell",
   "windows": ["main", "settings"],
   "permissions": [
-    "default",
     "core:default",
-    "notification:default"
+    "notification:default",
+    "default"
   ],
   "remote": {
     "urls": ["https://web.whatsapp.com/*"]
