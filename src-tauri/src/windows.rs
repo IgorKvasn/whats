@@ -62,8 +62,3 @@ pub fn install_close_to_tray(app: &AppHandle) {
     });
 }
 
-pub fn show_main_on_startup(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window(MAIN_LABEL) {
-        let _ = w.show();
-    }
-}
