@@ -76,25 +76,44 @@
   }
 
   // --- disconnected detector ---
+  const DISC_RE = /phone not connected|computer not connected|trouble connecting/i;
+
   let lastDisconnected = null;
-  function detectDisconnected() {
-    const text = (document.body && document.body.innerText) || '';
-    const isDisc =
-      /phone not connected/i.test(text) ||
-      /computer not connected/i.test(text) ||
-      /trouble connecting/i.test(text);
+  let checkScheduled = false;
+
+  function checkDisconnected() {
+    checkScheduled = false;
+    const alerts = document.querySelectorAll('[role="alert"], [aria-live="polite"], [aria-live="assertive"]');
+    let text = '';
+    alerts.forEach(function (el) { text += el.textContent; });
+    const isDisc = DISC_RE.test(text);
     if (isDisc !== lastDisconnected) {
       lastDisconnected = isDisc;
       safeInvoke('report_disconnected', { disconnected: isDisc });
     }
   }
 
+  function scheduleCheck() {
+    if (!checkScheduled) {
+      checkScheduled = true;
+      setTimeout(checkDisconnected, 1000);
+    }
+  }
+
+  function watchDisconnected() {
+    checkDisconnected();
+    new MutationObserver(scheduleCheck).observe(document.body, {
+      subtree: true,
+      childList: true,
+    });
+    setInterval(checkDisconnected, 30000);
+  }
+
   // bootstrap: run as soon as DOM is usable
   function boot() {
     installNotificationShim();
     watchTitle();
-    detectDisconnected();
-    setInterval(detectDisconnected, 5000);
+    watchDisconnected();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot, { once: true });
