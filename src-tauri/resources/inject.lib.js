@@ -7,6 +7,16 @@ export function parseUnread(title) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function readCandidate(doc, selector) {
+  const el = doc && typeof doc.querySelector === 'function' ? doc.querySelector(selector) : null;
+  if (!el) return '';
+  return normalizeText(el.getAttribute?.('title') || el.textContent);
+}
+
 export function makeNotificationShim(invokeFn) {
   function Shim(title, options) {
     const body = options && typeof options.body === 'string' ? options.body : null;
@@ -19,4 +29,34 @@ export function makeNotificationShim(invokeFn) {
     return Promise.resolve('granted');
   };
   return Shim;
+}
+
+export function shouldNotifyFromUnreadDelta({
+  previousUnread,
+  nextUnread,
+  nowMs,
+  lastDirectNotificationAtMs,
+  dedupeWindowMs,
+}) {
+  if (!Number.isFinite(previousUnread) || previousUnread < 0) return false;
+  if (!Number.isFinite(nextUnread) || nextUnread <= previousUnread) return false;
+  if (!Number.isFinite(nowMs)) return false;
+  if (!Number.isFinite(lastDirectNotificationAtMs)) return true;
+  return nowMs - lastDirectNotificationAtMs >= dedupeWindowMs;
+}
+
+export function pickFallbackNotificationPayload(doc) {
+  const sender =
+    readCandidate(doc, 'header [title]') ||
+    readCandidate(doc, '[aria-label*="Unread"] [title]') ||
+    readCandidate(doc, '[data-testid="cell-frame-title"] [title]');
+
+  if (!sender) return null;
+
+  const body =
+    readCandidate(doc, '[data-pre-plain-text] span[dir="auto"]') ||
+    readCandidate(doc, '[aria-label*="Unread"] span[dir="auto"]') ||
+    null;
+
+  return { sender, body };
 }

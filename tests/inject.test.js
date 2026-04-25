@@ -1,5 +1,28 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parseUnread, makeNotificationShim } from '../src-tauri/resources/inject.lib.js';
+import {
+  parseUnread,
+  makeNotificationShim,
+  shouldNotifyFromUnreadDelta,
+  pickFallbackNotificationPayload,
+} from '../src-tauri/resources/inject.lib.js';
+
+function makeDocumentFixture(map) {
+  return {
+    querySelector(selector) {
+      return map[selector] ?? null;
+    },
+  };
+}
+
+function makeElement({ textContent = '', title = null } = {}) {
+  return {
+    textContent,
+    getAttribute(name) {
+      if (name === 'title') return title;
+      return null;
+    },
+  };
+}
 
 describe('parseUnread', () => {
   it('returns 0 with no parens', () => expect(parseUnread('WhatsApp')).toBe(0));
@@ -34,5 +57,74 @@ describe('notification shim', () => {
   it('requestPermission resolves to granted', async () => {
     const Shim = makeNotificationShim(() => {});
     await expect(Shim.requestPermission()).resolves.toBe('granted');
+  });
+});
+
+describe('unread delta fallback', () => {
+  it('triggers when unread count increases without a recent direct notification', () => {
+    expect(
+      shouldNotifyFromUnreadDelta({
+        previousUnread: 1,
+        nextUnread: 2,
+        nowMs: 5000,
+        lastDirectNotificationAtMs: 0,
+        dedupeWindowMs: 1500,
+      }),
+    ).toBe(true);
+  });
+
+  it('does not trigger when unread count does not increase', () => {
+    expect(
+      shouldNotifyFromUnreadDelta({
+        previousUnread: 2,
+        nextUnread: 2,
+        nowMs: 5000,
+        lastDirectNotificationAtMs: 0,
+        dedupeWindowMs: 1500,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not trigger when a direct notification was just forwarded', () => {
+    expect(
+      shouldNotifyFromUnreadDelta({
+        previousUnread: 1,
+        nextUnread: 2,
+        nowMs: 5000,
+        lastDirectNotificationAtMs: 4500,
+        dedupeWindowMs: 1500,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('fallback payload extraction', () => {
+  it('prefers the active conversation title and preview text', () => {
+    const doc = makeDocumentFixture({
+      'header [title]': makeElement({ title: 'Alice', textContent: 'Alice' }),
+      '[data-pre-plain-text] span[dir="auto"]': makeElement({ textContent: 'latest message' }),
+    });
+
+    expect(pickFallbackNotificationPayload(doc)).toEqual({
+      sender: 'Alice',
+      body: 'latest message',
+    });
+  });
+
+  it('falls back to an unread chat row preview when no active conversation is visible', () => {
+    const doc = makeDocumentFixture({
+      '[aria-label*="Unread"] [title]': makeElement({ title: 'Bob', textContent: 'Bob' }),
+      '[aria-label*="Unread"] span[dir="auto"]': makeElement({ textContent: 'ping' }),
+    });
+
+    expect(pickFallbackNotificationPayload(doc)).toEqual({
+      sender: 'Bob',
+      body: 'ping',
+    });
+  });
+
+  it('returns null when it cannot find a plausible sender', () => {
+    const doc = makeDocumentFixture({});
+    expect(pickFallbackNotificationPayload(doc)).toBeNull();
   });
 });

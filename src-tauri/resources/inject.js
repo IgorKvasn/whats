@@ -32,12 +32,61 @@
     return Number.isFinite(n) ? n : 0;
   }
 
+  function normalizeText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function readCandidate(selector) {
+    const el = document.querySelector(selector);
+    if (!el) return '';
+    return normalizeText((el.getAttribute && el.getAttribute('title')) || el.textContent);
+  }
+
+  function shouldNotifyFromUnreadDelta(details) {
+    if (!Number.isFinite(details.previousUnread) || details.previousUnread < 0) return false;
+    if (!Number.isFinite(details.nextUnread) || details.nextUnread <= details.previousUnread) return false;
+    if (!Number.isFinite(details.nowMs)) return false;
+    if (!Number.isFinite(details.lastDirectNotificationAtMs)) return true;
+    return details.nowMs - details.lastDirectNotificationAtMs >= details.dedupeWindowMs;
+  }
+
+  function pickFallbackNotificationPayload() {
+    const sender =
+      readCandidate('header [title]') ||
+      readCandidate('[aria-label*="Unread"] [title]') ||
+      readCandidate('[data-testid="cell-frame-title"] [title]');
+
+    if (!sender) return null;
+
+    const body =
+      readCandidate('[data-pre-plain-text] span[dir="auto"]') ||
+      readCandidate('[aria-label*="Unread"] span[dir="auto"]') ||
+      null;
+
+    return { sender, body };
+  }
+
   let lastUnread = -1;
+  let lastDirectNotificationAtMs = Number.NEGATIVE_INFINITY;
   function pushTitle() {
     const n = parseUnread(document.title);
+    const prev = lastUnread;
     if (n !== lastUnread) {
       lastUnread = n;
       safeInvoke('report_unread', { count: n });
+      if (shouldNotifyFromUnreadDelta({
+        previousUnread: prev,
+        nextUnread: n,
+        nowMs: Date.now(),
+        lastDirectNotificationAtMs,
+        dedupeWindowMs: 1500,
+      })) {
+        const payload = pickFallbackNotificationPayload();
+        if (payload) {
+          console.log('[whats] forwarding fallback notification', payload);
+          safeInvoke('notify_message', payload);
+        }
+      }
     }
   }
   function watchTitle() {
@@ -55,6 +104,7 @@
   // --- notification interceptor ---
   function forwardNotification(title, options) {
     const body = options && typeof options.body === 'string' ? options.body : null;
+    lastDirectNotificationAtMs = Date.now();
     console.log('[whats] forwarding notification', { title, bodyLen: body ? body.length : 0 });
     safeInvoke('notify_message', { sender: String(title || ''), body });
   }
