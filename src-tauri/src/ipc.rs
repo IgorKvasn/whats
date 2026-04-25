@@ -1,5 +1,6 @@
 use crate::settings::Settings;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, State};
@@ -35,6 +36,36 @@ pub fn report_disconnected(app: AppHandle, disconnected: bool) {
     crate::tray::update(&app, None, Some(disconnected));
 }
 
+#[tauri::command]
+pub fn open_external(url: String) -> Result<(), String> {
+    if !is_safe_external_url(&url) {
+        return Err(format!("rejected url scheme: {url}"));
+    }
+    Command::new("xdg-open")
+        .arg(&url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+fn is_safe_external_url(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    matches!(
+        lower.split_once(':'),
+        Some(("http", _)) | Some(("https", _)) | Some(("mailto", _)) | Some(("tel", _))
+    )
+}
+
+#[tauri::command]
+pub fn preview_notification(app: AppHandle) {
+    crate::notify::preview(&app, false);
+}
+
+#[tauri::command]
+pub fn preview_sound(app: AppHandle) {
+    crate::notify::preview(&app, true);
+}
+
 pub fn should_dispatch(
     last: Option<&(Instant, String, String)>,
     now: Instant,
@@ -60,6 +91,10 @@ pub fn notify_message(
 ) {
     let sender: String = sender.chars().take(200).collect();
     let body: Option<String> = body.map(|b| b.chars().take(1000).collect());
+    eprintln!(
+        "notify_message: received sender={sender:?} body_len={}",
+        body.as_deref().map(str::len).unwrap_or(0)
+    );
 
     let now = Instant::now();
     let dedup_window = Duration::from_millis(1500);
@@ -70,6 +105,7 @@ pub fn notify_message(
     };
 
     if !dispatch {
+        eprintln!("notify_message: deduped sender={sender:?}");
         return;
     }
 
@@ -106,6 +142,24 @@ mod tests {
         let last = (base, "Alice".to_string(), "hi".to_string());
         let now = base + Duration::from_millis(2000);
         assert!(should_dispatch(Some(&last), now, "Alice", Some("hi"), Duration::from_millis(1500)));
+    }
+
+    #[test]
+    fn safe_external_url_accepts_web_and_contact_schemes() {
+        assert!(is_safe_external_url("https://example.com"));
+        assert!(is_safe_external_url("HTTP://example.com"));
+        assert!(is_safe_external_url("mailto:a@b.c"));
+        assert!(is_safe_external_url("tel:+1234"));
+    }
+
+    #[test]
+    fn safe_external_url_rejects_dangerous_schemes() {
+        assert!(!is_safe_external_url("file:///etc/passwd"));
+        assert!(!is_safe_external_url("javascript:alert(1)"));
+        assert!(!is_safe_external_url("data:text/html,<script>"));
+        assert!(!is_safe_external_url("ssh://host"));
+        assert!(!is_safe_external_url("not-a-url"));
+        assert!(!is_safe_external_url(""));
     }
 
     #[test]

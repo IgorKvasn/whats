@@ -64,6 +64,9 @@ pub fn run() {
             crate::ipc::report_unread,
             crate::ipc::report_disconnected,
             crate::ipc::notify_message,
+            crate::ipc::preview_notification,
+            crate::ipc::preview_sound,
+            crate::ipc::open_external,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

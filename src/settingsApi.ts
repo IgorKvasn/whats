@@ -13,3 +13,11 @@ export async function getSettings(): Promise<Settings> {
 export async function setSettings(s: Settings): Promise<void> {
   await invoke('set_settings', { newSettings: s });
 }
+
+export async function previewNotification(): Promise<void> {
+  await invoke('preview_notification');
+}
+
+export async function previewSound(): Promise<void> {
+  await invoke('preview_sound');
+}

@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { getSettings, setSettings, type Settings } from './settingsApi';
+import {
+  getSettings,
+  previewNotification,
+  previewSound,
+  setSettings,
+  type Settings,
+} from './settingsApi';
 import './styles.css';
 
 export default function App() {
@@ -35,6 +41,15 @@ export default function App() {
         />
         <span>Show notifications</span>
       </label>
+      <div className="row">
+        <button
+          type="button"
+          onClick={() => previewNotification().catch((e) => setError(String(e)))}
+          disabled={!settings.notifications_enabled}
+        >
+          Preview notification
+        </button>
+      </div>
       <label className="row">
         <input
           type="checkbox"
@@ -44,6 +59,15 @@ export default function App() {
         />
         <span>Play sound on notification</span>
       </label>
+      <div className="row">
+        <button
+          type="button"
+          onClick={() => previewSound().catch((e) => setError(String(e)))}
+          disabled={!settings.notifications_enabled || !settings.sound_enabled}
+        >
+          Preview sound
+        </button>
+      </div>
       <label className="row">
         <input
           type="checkbox"

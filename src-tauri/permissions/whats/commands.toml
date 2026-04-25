@@ -6,6 +6,9 @@ permissions = [
   "allow-report-unread",
   "allow-report-disconnected",
   "allow-notify-message",
+  "allow-preview-notification",
+  "allow-preview-sound",
+  "allow-open-external",
 ]
 
 [[permission]]
@@ -32,3 +35,18 @@ commands.allow = ["report_disconnected"]
 identifier = "allow-notify-message"
 description = "Fire a native notification for a new message"
 commands.allow = ["notify_message"]
+
+[[permission]]
+identifier = "allow-preview-notification"
+description = "Fire a preview notification from settings"
+commands.allow = ["preview_notification"]
+
+[[permission]]
+identifier = "allow-preview-sound"
+description = "Fire a preview notification with sound from settings"
+commands.allow = ["preview_sound"]
+
+[[permission]]
+identifier = "allow-open-external"
+description = "Open a URL in the system default browser"
+commands.allow = ["open_external"]
