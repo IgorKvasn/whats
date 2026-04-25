@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.0 — 2026-04-25
+
+### Documentation
+
+- add unofficial third-party wrapper disclaimer
+
+
 ## v0.3.0 — 2026-04-25
 
 ### Features

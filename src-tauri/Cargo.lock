@@ -4979,7 +4979,7 @@ dependencies = [
 
 [[package]]
 name = "whats"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "reqwest 0.12.28",
