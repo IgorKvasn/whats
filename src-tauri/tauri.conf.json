@@ -19,6 +19,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "SocialNetwork",
+    "shortDescription": "Unofficial desktop wrapper for WhatsApp Web",
+    "longDescription": "An unofficial third-party desktop wrapper that hosts the WhatsApp Web site in a persistent webview, with a system tray, native notifications, and a settings window. Not affiliated with, endorsed by, or associated with WhatsApp or Meta Platforms, Inc.",
     "linux": {
       "deb": {
         "desktopTemplate": "bundle/linux/whats.desktop.hbs"
