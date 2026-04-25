@@ -32,6 +32,19 @@ pub fn preview(app: &AppHandle, with_sound: bool) {
     show(app, "WhatsApp", body, with_sound);
 }
 
+pub fn update_check_failed(app: &AppHandle, settings: &Settings) {
+    if !settings.notifications_enabled {
+        eprintln!("notify::update_check_failed: skipped (notifications_enabled=false)");
+        return;
+    }
+    show(
+        app,
+        "WhatsApp",
+        "Couldn't check for updates — please verify your internet connection.",
+        false,
+    );
+}
+
 const SOUND_FILE: &str = "/usr/share/sounds/freedesktop/stereo/message-new-instant.oga";
 
 static APP_IMAGE_PATH: OnceLock<Option<PathBuf>> = OnceLock::new();
