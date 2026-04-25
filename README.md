@@ -1,5 +1,7 @@
 # whats — WhatsApp Desktop (Tauri)
 
+> **Disclaimer:** This project was entirely created by Claude Code and Codex.
+
 A small Tauri v2 desktop application that hosts `https://web.whatsapp.com` in a persistent webview, with a system tray, native notifications, and a settings window.
 
 See `docs/superpowers/specs/2026-04-24-whatsapp-tauri-design.md` for the design and `docs/superpowers/plans/2026-04-24-whatsapp-tauri.md` for the implementation plan.
