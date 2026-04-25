@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0 — 2026-04-25
+
+### Features
+
+- render release notes as markdown
+
+
 ## v0.2.0 — 2026-04-25
 
 ### Features
