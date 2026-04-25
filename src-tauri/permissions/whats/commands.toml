@@ -5,6 +5,7 @@ permissions = [
   "allow-get-update-info",
   "allow-get-settings",
   "allow-set-settings",
+  "allow-check-for-updates-now",
   "allow-set-skipped-version",
   "allow-report-unread",
   "allow-report-disconnected",
@@ -63,6 +64,11 @@ commands.allow = ["preview_sound"]
 identifier = "allow-open-external"
 description = "Open a URL in the system default browser"
 commands.allow = ["open_external"]
+
+[[permission]]
+identifier = "allow-check-for-updates-now"
+description = "Manually trigger an update check"
+commands.allow = ["check_for_updates_now"]
 
 [[permission]]
 identifier = "allow-set-skipped-version"

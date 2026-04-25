@@ -202,6 +202,49 @@ fn record_success(app: &tauri::AppHandle, now: i64) {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum ManualCheckResult {
+    UpdateAvailable,
+    UpToDate { current: String },
+    Failed { error: String },
+}
+
+pub async fn run_manual_check(app: &tauri::AppHandle) -> ManualCheckResult {
+    let state = app.state::<crate::ipc::AppState>();
+    let app_version = env!("CARGO_PKG_VERSION");
+
+    match fetch_latest_release(REPO, app_version).await {
+        FetchOutcome::Failed(err) => ManualCheckResult::Failed { error: err },
+        FetchOutcome::NoReleases => {
+            record_success(app, current_unix_seconds());
+            ManualCheckResult::UpToDate {
+                current: app_version.to_string(),
+            }
+        }
+        FetchOutcome::Found(release) => {
+            record_success(app, current_unix_seconds());
+            // Manual check: ignore skipped_version
+            if decide_update(app_version, &release.tag_name, None) {
+                let info = build_update_info(&release, app_version);
+                {
+                    let mut slot = state.current_update.lock().unwrap();
+                    *slot = Some(info);
+                }
+                let app_clone = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    crate::windows::show_update_window(&app_clone);
+                });
+                ManualCheckResult::UpdateAvailable
+            } else {
+                ManualCheckResult::UpToDate {
+                    current: app_version.to_string(),
+                }
+            }
+        }
+    }
+}
+
 fn handle_failure(app: &tauri::AppHandle) {
     let state = app.state::<crate::ipc::AppState>();
     let (snapshot, fire_notification) = {

@@ -141,6 +141,11 @@ pub fn get_update_info(state: State<'_, AppState>) -> Result<UpdateInfo, String>
 }
 
 #[tauri::command]
+pub async fn check_for_updates_now(app: AppHandle) -> crate::updater::ManualCheckResult {
+    crate::updater::run_manual_check(&app).await
+}
+
+#[tauri::command]
 pub fn set_skipped_version(
     state: State<'_, AppState>,
     tag: String,

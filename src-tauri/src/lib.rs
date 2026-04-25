@@ -80,6 +80,7 @@ pub fn run() {
             crate::ipc::get_update_info,
             crate::ipc::get_settings,
             crate::ipc::set_settings,
+            crate::ipc::check_for_updates_now,
             crate::ipc::set_skipped_version,
             crate::ipc::report_unread,
             crate::ipc::report_disconnected,
