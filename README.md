@@ -47,6 +47,35 @@ Run frontend unit tests (added in Task 10b):
 npm test
 ```
 
+## Releasing
+
+Releases are cut with `scripts/release.sh`. The script bumps the version across `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, regenerates `CHANGELOG.md` from Conventional Commit messages since the last `v*` tag, builds a `.deb` via `scripts/build-deb.sh`, then commits, tags, pushes, and publishes a GitHub release with the `.deb` attached.
+
+### One-time setup
+
+- Install the GitHub CLI and authenticate:
+  ```bash
+  sudo apt install gh
+  gh auth login
+  ```
+- Make sure `python3`, `cargo`, `node`, `npm`, and `dpkg-deb` are on `PATH` (the Linux build prerequisites above already cover most of these).
+
+### Cutting a release
+
+1. Land all changes on `main` and ensure the working tree is clean.
+2. Preview the release:
+   ```bash
+   scripts/release.sh --bump patch --dry-run
+   ```
+   Inspect the generated changelog section and the list of mutating commands.
+3. Run for real:
+   ```bash
+   scripts/release.sh --bump patch
+   ```
+   Use `--bump minor`, `--bump major`, or `--bump X.Y.Z` to pick the version. Add `--draft` or `--prerelease` when appropriate, `--skip-tests` to skip the test/build step inside `build-deb.sh`, and `--yes` to skip the confirmation prompt.
+
+The script refuses to run if the working tree is dirty, you're not on `main`, `gh` is not authenticated, or the target tag already exists.
+
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
