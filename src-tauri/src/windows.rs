@@ -3,6 +3,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 const MAIN_LABEL: &str = "main";
 const SETTINGS_LABEL: &str = "settings";
 const ABOUT_LABEL: &str = "about";
+const UPDATE_LABEL: &str = "update";
 
 pub fn main_in_foreground(app: &AppHandle) -> bool {
     let Some(w) = app.get_webview_window(MAIN_LABEL) else {
@@ -57,6 +58,18 @@ pub fn show_about(app: &AppHandle) {
         240.0,
         320.0,
         220.0,
+    );
+}
+
+pub fn show_update_window(app: &AppHandle) {
+    show_dialog_window(
+        app,
+        UPDATE_LABEL,
+        "WhatsApp — Update available",
+        480.0,
+        420.0,
+        360.0,
+        320.0,
     );
 }
 
