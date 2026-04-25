@@ -1,8 +1,10 @@
 use crate::settings::Settings;
+use std::path::PathBuf;
 use std::process::Command;
-use tauri::AppHandle;
+use std::sync::OnceLock;
+use tauri::{AppHandle, Manager};
 
-pub fn dispatch(_app: &AppHandle, settings: Settings, sender: &str, body: Option<&str>) {
+pub fn dispatch(app: &AppHandle, settings: Settings, sender: &str, body: Option<&str>) {
     if !settings.notifications_enabled {
         eprintln!("notify::dispatch: skipped (notifications_enabled=false)");
         return;
@@ -17,24 +19,44 @@ pub fn dispatch(_app: &AppHandle, settings: Settings, sender: &str, body: Option
         body_text.len(),
         settings.sound_enabled
     );
-    show(sender, body_text, settings.sound_enabled);
+    show(app, sender, body_text, settings.sound_enabled);
 }
 
-pub fn preview(_app: &AppHandle, with_sound: bool) {
+pub fn preview(app: &AppHandle, with_sound: bool) {
     let body = if with_sound {
         "Sound preview"
     } else {
         "Notification preview"
     };
-    show("WhatsApp", body, with_sound);
+    show(app, "WhatsApp", body, with_sound);
 }
 
 const SOUND_FILE: &str = "/usr/share/sounds/freedesktop/stereo/message-new-instant.oga";
 
-fn show(title: &str, body: &str, with_sound: bool) {
-    let status = Command::new("notify-send")
-        .arg("-a").arg("WhatsApp")
-        .arg("-i").arg("dialog-information")
+static APP_IMAGE_PATH: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+fn app_image_path(app: &AppHandle) -> Option<&'static PathBuf> {
+    APP_IMAGE_PATH
+        .get_or_init(|| {
+            let resource_dir = app.path().resource_dir().ok()?;
+            for candidate in ["icons/128x128.png", "icons/icon.png", "icons/32x32.png"] {
+                let p = resource_dir.join(candidate);
+                if p.is_file() {
+                    return Some(p);
+                }
+            }
+            None
+        })
+        .as_ref()
+}
+
+fn show(app: &AppHandle, title: &str, body: &str, with_sound: bool) {
+    let mut cmd = Command::new("notify-send");
+    cmd.arg("-a").arg("WhatsApp");
+    if let Some(image) = app_image_path(app) {
+        cmd.arg(format!("--hint=string:image-path:{}", image.display()));
+    }
+    let status = cmd
         .arg("--")
         .arg(title)
         .arg(body)
