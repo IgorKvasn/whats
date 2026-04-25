@@ -5,6 +5,7 @@ permissions = [
   "allow-get-update-info",
   "allow-get-settings",
   "allow-set-settings",
+  "allow-set-skipped-version",
   "allow-report-unread",
   "allow-report-disconnected",
   "allow-notify-message",
@@ -62,3 +63,8 @@ commands.allow = ["preview_sound"]
 identifier = "allow-open-external"
 description = "Open a URL in the system default browser"
 commands.allow = ["open_external"]
+
+[[permission]]
+identifier = "allow-set-skipped-version"
+description = "Persist a version tag the user wants to skip"
+commands.allow = ["set_skipped_version"]

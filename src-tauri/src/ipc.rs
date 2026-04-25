@@ -140,6 +140,19 @@ pub fn get_update_info(state: State<'_, AppState>) -> Result<UpdateInfo, String>
         .ok_or_else(|| "no update info available".to_string())
 }
 
+#[tauri::command]
+pub fn set_skipped_version(
+    state: State<'_, AppState>,
+    tag: String,
+) -> Result<(), String> {
+    let mut guard = state.settings.lock().unwrap();
+    guard.update_state.skipped_version = Some(tag);
+    let snapshot = guard.clone();
+    drop(guard);
+    snapshot.save(&state.settings_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
