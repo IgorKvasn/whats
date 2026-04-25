@@ -3,11 +3,29 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Settings {
     pub notifications_enabled: bool,
     pub sound_enabled: bool,
     pub include_preview: bool,
+    #[serde(default = "default_auto_update_check_enabled")]
+    pub auto_update_check_enabled: bool,
+    #[serde(default)]
+    pub update_state: UpdateState,
+}
+
+fn default_auto_update_check_enabled() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateState {
+    #[serde(default)]
+    pub last_checked_at: Option<i64>,
+    #[serde(default)]
+    pub skipped_version: Option<String>,
+    #[serde(default)]
+    pub consecutive_failures: u32,
 }
 
 impl Default for Settings {
@@ -16,6 +34,8 @@ impl Default for Settings {
             notifications_enabled: true,
             sound_enabled: true,
             include_preview: false,
+            auto_update_check_enabled: true,
+            update_state: UpdateState::default(),
         }
     }
 }
@@ -75,6 +95,8 @@ mod tests {
             notifications_enabled: false,
             sound_enabled: false,
             include_preview: true,
+            auto_update_check_enabled: true,
+            update_state: UpdateState::default(),
         };
         s.save(&path).unwrap();
         let loaded = Settings::load_or_default(&path);
@@ -105,5 +127,54 @@ mod tests {
         let path = dir.path().join("nested/sub/settings.json");
         Settings::default().save(&path).unwrap();
         assert!(path.exists());
+    }
+
+    #[test]
+    fn defaults_have_auto_update_enabled() {
+        let s = Settings::default();
+        assert!(s.auto_update_check_enabled);
+        assert!(s.update_state.last_checked_at.is_none());
+        assert!(s.update_state.skipped_version.is_none());
+        assert_eq!(s.update_state.consecutive_failures, 0);
+    }
+
+    #[test]
+    fn legacy_settings_file_loads_with_defaults_filled_in() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        // Old shape: only the original three fields, no auto-update fields
+        fs::write(
+            &path,
+            br#"{"notifications_enabled":true,"sound_enabled":false,"include_preview":true}"#,
+        )
+        .unwrap();
+        let s = Settings::load_or_default(&path);
+        assert_eq!(s.notifications_enabled, true);
+        assert_eq!(s.sound_enabled, false);
+        assert_eq!(s.include_preview, true);
+        assert!(s.auto_update_check_enabled, "missing field should default to true");
+        assert_eq!(s.update_state.consecutive_failures, 0);
+        assert!(s.update_state.last_checked_at.is_none());
+        assert!(s.update_state.skipped_version.is_none());
+    }
+
+    #[test]
+    fn round_trip_with_update_state() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let s = Settings {
+            notifications_enabled: true,
+            sound_enabled: true,
+            include_preview: false,
+            auto_update_check_enabled: false,
+            update_state: UpdateState {
+                last_checked_at: Some(1_700_000_000),
+                skipped_version: Some("v0.2.0".to_string()),
+                consecutive_failures: 2,
+            },
+        };
+        s.save(&path).unwrap();
+        let loaded = Settings::load_or_default(&path);
+        assert_eq!(loaded, s);
     }
 }

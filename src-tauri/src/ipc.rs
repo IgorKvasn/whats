@@ -18,7 +18,7 @@ pub fn get_build_info() -> crate::build_info::BuildInfo {
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Settings {
-    *state.settings.lock().unwrap()
+    state.settings.lock().unwrap().clone()
 }
 
 #[tauri::command]
@@ -124,7 +124,7 @@ pub fn notify_message(
         *last = Some((now, sender.clone(), body.clone().unwrap_or_default()));
     }
 
-    let settings = *state.settings.lock().unwrap();
+    let settings = state.settings.lock().unwrap().clone();
     crate::notify::dispatch(&app, settings, &sender, body.as_deref());
 }
 
