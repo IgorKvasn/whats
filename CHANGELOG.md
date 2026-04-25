@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.0 — 2026-04-25
+
+### Chores
+
+- set proper package name and description for deb
+
+
 ## v0.4.0 — 2026-04-25
 
 ### Documentation
