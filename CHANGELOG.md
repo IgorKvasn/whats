@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.0 — 2026-04-25
+
+### Features
+
+- show app version in About view
+
+### Build
+
+- enforce conventional commits via husky commit-msg hook
+
+
 All notable changes to this project are documented here.
 
 ## v0.1.1 — 2026-04-25
