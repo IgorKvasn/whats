@@ -1,4 +1,5 @@
 use crate::settings::Settings;
+use crate::updater::UpdateInfo;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
@@ -9,6 +10,7 @@ pub struct AppState {
     pub settings: Mutex<Settings>,
     pub settings_path: PathBuf,
     pub last_notification: Mutex<Option<(Instant, String, String)>>,
+    pub current_update: Mutex<Option<UpdateInfo>>,
 }
 
 #[tauri::command]
@@ -126,6 +128,16 @@ pub fn notify_message(
 
     let settings = state.settings.lock().unwrap().clone();
     crate::notify::dispatch(&app, settings, &sender, body.as_deref());
+}
+
+#[tauri::command]
+pub fn get_update_info(state: State<'_, AppState>) -> Result<UpdateInfo, String> {
+    state
+        .current_update
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "no update info available".to_string())
 }
 
 #[cfg(test)]

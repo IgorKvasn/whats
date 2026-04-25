@@ -2,6 +2,7 @@
 description = "Allow whats app commands"
 permissions = [
   "allow-get-build-info",
+  "allow-get-update-info",
   "allow-get-settings",
   "allow-set-settings",
   "allow-report-unread",
@@ -16,6 +17,11 @@ permissions = [
 identifier = "allow-get-build-info"
 description = "Read current build metadata"
 commands.allow = ["get_build_info"]
+
+[[permission]]
+identifier = "allow-get-update-info"
+description = "Read the currently-detected update info (if any)"
+commands.allow = ["get_update_info"]
 
 [[permission]]
 identifier = "allow-get-settings"

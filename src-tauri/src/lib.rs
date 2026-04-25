@@ -31,6 +31,7 @@ pub fn run() {
                 settings: std::sync::Mutex::new(settings),
                 settings_path,
                 last_notification: std::sync::Mutex::new(None),
+                current_update: std::sync::Mutex::new(None),
             });
             let tray_handle = crate::tray::build_tray(app)?;
             app.manage(tray_handle);
@@ -62,6 +63,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             crate::ipc::get_build_info,
+            crate::ipc::get_update_info,
             crate::ipc::get_settings,
             crate::ipc::set_settings,
             crate::ipc::report_unread,
