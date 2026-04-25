@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
+import Markdown from 'react-markdown';
 import { getBuildInfo, type BuildInfo } from './buildInfoApi';
 import {
   getSettings,
@@ -254,7 +255,25 @@ function UpdateView() {
       {info.body_excerpt && (
         <>
           <h2 className="release-notes-heading">Release notes</h2>
-          <pre className="release-notes">{info.body_excerpt}</pre>
+          <div className="release-notes">
+            <Markdown
+              components={{
+                a: ({ href, children }) => (
+                  <a
+                    href={href}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (href) invoke('open_external', { url: href });
+                    }}
+                  >
+                    {children}
+                  </a>
+                ),
+              }}
+            >
+              {info.body_excerpt}
+            </Markdown>
+          </div>
         </>
       )}
       <label className="row">
