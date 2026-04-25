@@ -3,6 +3,15 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 const MAIN_LABEL: &str = "main";
 const SETTINGS_LABEL: &str = "settings";
 
+pub fn main_in_foreground(app: &AppHandle) -> bool {
+    let Some(w) = app.get_webview_window(MAIN_LABEL) else {
+        return false;
+    };
+    w.is_visible().unwrap_or(false)
+        && !w.is_minimized().unwrap_or(false)
+        && w.is_focused().unwrap_or(false)
+}
+
 pub fn show_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window(MAIN_LABEL) {
         let _ = w.unminimize();

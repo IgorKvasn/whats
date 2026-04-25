@@ -96,6 +96,11 @@ pub fn notify_message(
         body.as_deref().map(str::len).unwrap_or(0)
     );
 
+    if crate::windows::main_in_foreground(&app) {
+        eprintln!("notify_message: skipped (main window in foreground)");
+        return;
+    }
+
     let now = Instant::now();
     let dedup_window = Duration::from_millis(1500);
 
