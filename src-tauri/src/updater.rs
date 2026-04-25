@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
@@ -182,7 +184,6 @@ pub async fn run_startup_check(app: &tauri::AppHandle) {
 }
 
 fn current_unix_seconds() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
@@ -211,7 +212,6 @@ pub enum ManualCheckResult {
 }
 
 pub async fn run_manual_check(app: &tauri::AppHandle) -> ManualCheckResult {
-    let state = app.state::<crate::ipc::AppState>();
     let app_version = env!("CARGO_PKG_VERSION");
 
     match fetch_latest_release(REPO, app_version).await {
@@ -223,9 +223,10 @@ pub async fn run_manual_check(app: &tauri::AppHandle) -> ManualCheckResult {
             }
         }
         FetchOutcome::Found(release) => {
-            record_success(app, current_unix_seconds());
-            // Manual check: ignore skipped_version
+            let now = current_unix_seconds();
+            record_success(app, now);
             if decide_update(app_version, &release.tag_name, None) {
+                let state = app.state::<crate::ipc::AppState>();
                 let info = build_update_info(&release, app_version);
                 {
                     let mut slot = state.current_update.lock().unwrap();
