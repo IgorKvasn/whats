@@ -119,6 +119,112 @@ pub fn body_excerpt(body: Option<&str>, max_chars: usize) -> String {
     format!("{truncated}…")
 }
 
+pub const REPO: &str = "IgorKvasn/whats";
+pub const THROTTLE_SECONDS: i64 = 24 * 60 * 60;
+pub const FAILURE_THRESHOLD: u32 = 3;
+pub const BODY_EXCERPT_MAX_CHARS: usize = 500;
+
+pub fn should_run_check(now_unix: i64, last_checked_at: Option<i64>) -> bool {
+    match last_checked_at {
+        None => true,
+        Some(t) => now_unix - t >= THROTTLE_SECONDS,
+    }
+}
+
+pub async fn run_startup_check(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let state = app.state::<crate::ipc::AppState>();
+
+    let (last_checked_at, skipped_version) = {
+        let s = state.settings.lock().unwrap();
+        (s.update_state.last_checked_at, s.update_state.skipped_version.clone())
+    };
+
+    let now = current_unix_seconds();
+    if !should_run_check(now, last_checked_at) {
+        eprintln!("updater: throttled (last_checked_at={last_checked_at:?})");
+        return;
+    }
+
+    let app_version = env!("CARGO_PKG_VERSION");
+    match fetch_latest_release(REPO, app_version).await {
+        FetchOutcome::Failed(err) => {
+            eprintln!("updater: fetch failed: {err}");
+            handle_failure(app);
+        }
+        FetchOutcome::NoReleases => {
+            eprintln!("updater: repo has no releases yet");
+            record_success(app, now);
+        }
+        FetchOutcome::Found(release) => {
+            record_success(app, now);
+            if let Some(mut info) =
+                decide_update(app_version, &release.tag_name, skipped_version.as_deref())
+            {
+                info.release_name = release
+                    .name
+                    .clone()
+                    .filter(|n| !n.trim().is_empty())
+                    .unwrap_or_else(|| release.tag_name.clone());
+                info.released_at = release.published_at.clone().unwrap_or_default();
+                info.body_excerpt = body_excerpt(release.body.as_deref(), BODY_EXCERPT_MAX_CHARS);
+                info.html_url = release.html_url.clone();
+
+                {
+                    let mut slot = state.current_update.lock().unwrap();
+                    *slot = Some(info);
+                }
+                let app_clone = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    crate::windows::show_update_window(&app_clone);
+                });
+            }
+        }
+    }
+}
+
+fn current_unix_seconds() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+fn record_success(app: &tauri::AppHandle, now: i64) {
+    use tauri::Manager;
+    let state = app.state::<crate::ipc::AppState>();
+    let snapshot = {
+        let mut s = state.settings.lock().unwrap();
+        s.update_state.last_checked_at = Some(now);
+        s.update_state.consecutive_failures = 0;
+        s.clone()
+    };
+    if let Err(e) = snapshot.save(&state.settings_path) {
+        eprintln!("updater: persist failed: {e}");
+    }
+}
+
+fn handle_failure(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let state = app.state::<crate::ipc::AppState>();
+    let (snapshot, fire_notification) = {
+        let mut s = state.settings.lock().unwrap();
+        s.update_state.consecutive_failures = s.update_state.consecutive_failures.saturating_add(1);
+        let fire = s.update_state.consecutive_failures >= FAILURE_THRESHOLD;
+        if fire {
+            s.update_state.consecutive_failures = 0;
+        }
+        (s.clone(), fire)
+    };
+    if let Err(e) = snapshot.save(&state.settings_path) {
+        eprintln!("updater: persist failed: {e}");
+    }
+    if fire_notification {
+        crate::notify::update_check_failed(app, &snapshot);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,5 +295,31 @@ mod tests {
         let out = body_excerpt(Some(&long), 500);
         assert_eq!(out.chars().count(), 501); // 500 + ellipsis char
         assert!(out.ends_with('…'));
+    }
+
+    #[test]
+    fn should_run_when_never_checked() {
+        assert!(should_run_check(1_700_000_000, None));
+    }
+
+    #[test]
+    fn should_skip_when_recently_checked() {
+        let now = 1_700_000_000;
+        let last = now - 1000;
+        assert!(!should_run_check(now, Some(last)));
+    }
+
+    #[test]
+    fn should_run_after_24h() {
+        let now = 1_700_000_000;
+        let last = now - THROTTLE_SECONDS;
+        assert!(should_run_check(now, Some(last)));
+    }
+
+    #[test]
+    fn should_run_just_past_24h() {
+        let now = 1_700_000_000;
+        let last = now - THROTTLE_SECONDS - 1;
+        assert!(should_run_check(now, Some(last)));
     }
 }

@@ -59,6 +59,20 @@ pub fn run() {
 
             let handle = app.handle().clone();
             crate::windows::install_close_to_tray(&handle);
+
+            let auto_check = {
+                let state = handle.state::<crate::ipc::AppState>();
+                let s = state.settings.lock().unwrap();
+                s.auto_update_check_enabled
+            };
+            if auto_check {
+                let handle_for_task = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    crate::updater::run_startup_check(&handle_for_task).await;
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
