@@ -1,5 +1,19 @@
 # whats — WhatsApp Desktop (Tauri)
 
+> **⚠️ IMPORTANT DISCLAIMER**
+>
+> This project is an **unofficial, third-party wrapper** around the WhatsApp Web
+> site (`https://web.whatsapp.com`). It is **not affiliated with, endorsed by,
+> sponsored by, or in any way associated with WhatsApp, Meta Platforms, Inc.,
+> or any of their subsidiaries**.
+>
+> "WhatsApp" is a trademark of its respective owner. This project simply hosts
+> the official WhatsApp Web page in a desktop webview — it does not modify,
+> reverse-engineer, or reimplement the WhatsApp service or protocol.
+>
+> Use at your own risk. All interactions with WhatsApp are subject to
+> WhatsApp's own Terms of Service and Privacy Policy.
+
 > **Disclaimer:** This project was entirely created by Claude Code and Codex.
 
 A small Tauri v2 desktop application that hosts `https://web.whatsapp.com` in a persistent webview, with a system tray, native notifications, and a settings window.
