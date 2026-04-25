@@ -4,6 +4,9 @@ export interface Settings {
   notifications_enabled: boolean;
   sound_enabled: boolean;
   include_preview: boolean;
+  auto_update_check_enabled: boolean;
+  // update_state is internal Rust bookkeeping; round-tripped opaquely
+  update_state: unknown;
 }
 
 export async function getSettings(): Promise<Settings> {
