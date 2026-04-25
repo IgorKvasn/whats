@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpdateInfo {
@@ -14,10 +15,10 @@ pub fn decide_update(
     current: &str,
     latest_tag: &str,
     skipped_version: Option<&str>,
-) -> Option<UpdateInfo> {
+) -> bool {
     if let Some(skipped) = skipped_version {
         if skipped == latest_tag {
-            return None;
+            return false;
         }
     }
 
@@ -25,29 +26,37 @@ pub fn decide_update(
         Ok(v) => v,
         Err(e) => {
             eprintln!("updater: failed to parse current version {current:?}: {e}");
-            return None;
+            return false;
         }
     };
     let latest_v = match semver::Version::parse(strip_v(latest_tag)) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("updater: failed to parse latest tag {latest_tag:?}: {e}");
-            return None;
+            return false;
         }
     };
 
-    if latest_v <= current_v {
-        return None;
-    }
+    latest_v > current_v
+}
 
-    Some(UpdateInfo {
-        current_version: current.to_string(),
-        latest_version: latest_tag.to_string(),
-        release_name: String::new(),
-        released_at: String::new(),
-        body_excerpt: String::new(),
-        html_url: String::new(),
-    })
+pub fn build_update_info(release: &ReleaseInfo, current_version: &str) -> UpdateInfo {
+    let release_name = release
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| release.tag_name.clone());
+
+    UpdateInfo {
+        current_version: current_version.to_string(),
+        latest_version: release.tag_name.clone(),
+        release_name,
+        released_at: release.published_at.clone().unwrap_or_default(),
+        body_excerpt: body_excerpt(release.body.as_deref(), BODY_EXCERPT_MAX_CHARS),
+        html_url: release.html_url.clone(),
+    }
 }
 
 fn strip_v(s: &str) -> &str {
@@ -132,7 +141,6 @@ pub fn should_run_check(now_unix: i64, last_checked_at: Option<i64>) -> bool {
 }
 
 pub async fn run_startup_check(app: &tauri::AppHandle) {
-    use tauri::Manager;
     let state = app.state::<crate::ipc::AppState>();
 
     let (last_checked_at, skipped_version) = {
@@ -158,18 +166,8 @@ pub async fn run_startup_check(app: &tauri::AppHandle) {
         }
         FetchOutcome::Found(release) => {
             record_success(app, now);
-            if let Some(mut info) =
-                decide_update(app_version, &release.tag_name, skipped_version.as_deref())
-            {
-                info.release_name = release
-                    .name
-                    .clone()
-                    .filter(|n| !n.trim().is_empty())
-                    .unwrap_or_else(|| release.tag_name.clone());
-                info.released_at = release.published_at.clone().unwrap_or_default();
-                info.body_excerpt = body_excerpt(release.body.as_deref(), BODY_EXCERPT_MAX_CHARS);
-                info.html_url = release.html_url.clone();
-
+            if decide_update(app_version, &release.tag_name, skipped_version.as_deref()) {
+                let info = build_update_info(&release, app_version);
                 {
                     let mut slot = state.current_update.lock().unwrap();
                     *slot = Some(info);
@@ -192,7 +190,6 @@ fn current_unix_seconds() -> i64 {
 }
 
 fn record_success(app: &tauri::AppHandle, now: i64) {
-    use tauri::Manager;
     let state = app.state::<crate::ipc::AppState>();
     let snapshot = {
         let mut s = state.settings.lock().unwrap();
@@ -206,7 +203,6 @@ fn record_success(app: &tauri::AppHandle, now: i64) {
 }
 
 fn handle_failure(app: &tauri::AppHandle) {
-    use tauri::Manager;
     let state = app.state::<crate::ipc::AppState>();
     let (snapshot, fire_notification) = {
         let mut s = state.settings.lock().unwrap();
@@ -229,49 +225,80 @@ fn handle_failure(app: &tauri::AppHandle) {
 mod tests {
     use super::*;
 
-    #[test]
-    fn newer_release_returns_some() {
-        let info = decide_update("0.1.0", "v0.2.0", None);
-        assert!(info.is_some());
-        let info = info.unwrap();
-        assert_eq!(info.current_version, "0.1.0");
-        assert_eq!(info.latest_version, "v0.2.0");
+    fn release_fixture(tag: &str) -> ReleaseInfo {
+        ReleaseInfo {
+            tag_name: tag.to_string(),
+            name: Some("Release Title".to_string()),
+            published_at: Some("2026-04-25T12:00:00Z".to_string()),
+            body: Some("Notes".to_string()),
+            html_url: "https://example.com/r".to_string(),
+        }
     }
 
     #[test]
-    fn equal_versions_returns_none() {
-        assert!(decide_update("0.2.0", "v0.2.0", None).is_none());
-        assert!(decide_update("0.2.0", "0.2.0", None).is_none());
+    fn newer_release_decides_true() {
+        assert!(decide_update("0.1.0", "v0.2.0", None));
     }
 
     #[test]
-    fn older_release_returns_none() {
-        assert!(decide_update("0.3.0", "v0.2.0", None).is_none());
+    fn equal_versions_decide_false() {
+        assert!(!decide_update("0.2.0", "v0.2.0", None));
+        assert!(!decide_update("0.2.0", "0.2.0", None));
+    }
+
+    #[test]
+    fn older_release_decides_false() {
+        assert!(!decide_update("0.3.0", "v0.2.0", None));
     }
 
     #[test]
     fn semver_compare_not_lexical() {
-        // 0.10.0 > 0.2.0 in semver, but < lexically
-        assert!(decide_update("0.2.0", "v0.10.0", None).is_some());
+        assert!(decide_update("0.2.0", "v0.10.0", None));
     }
 
     #[test]
-    fn skipped_exact_match_returns_none() {
-        assert!(decide_update("0.1.0", "v0.2.0", Some("v0.2.0")).is_none());
-        // also matches without v-prefix variation: skip is "v0.2.0", tag is "v0.2.0"
+    fn skipped_exact_match_decides_false() {
+        assert!(!decide_update("0.1.0", "v0.2.0", Some("v0.2.0")));
     }
 
     #[test]
     fn skipped_older_than_latest_does_not_suppress() {
-        // user skipped v0.1.5; v0.2.0 has since been released — they should still see it
-        assert!(decide_update("0.1.0", "v0.2.0", Some("v0.1.5")).is_some());
+        assert!(decide_update("0.1.0", "v0.2.0", Some("v0.1.5")));
     }
 
     #[test]
-    fn garbage_versions_return_none_no_panic() {
-        assert!(decide_update("not-a-version", "v0.2.0", None).is_none());
-        assert!(decide_update("0.1.0", "not-a-version", None).is_none());
-        assert!(decide_update("", "", None).is_none());
+    fn garbage_versions_decide_false_no_panic() {
+        assert!(!decide_update("not-a-version", "v0.2.0", None));
+        assert!(!decide_update("0.1.0", "not-a-version", None));
+        assert!(!decide_update("", "", None));
+    }
+
+    #[test]
+    fn build_update_info_populates_all_fields() {
+        let release = release_fixture("v0.2.0");
+        let info = build_update_info(&release, "0.1.0");
+        assert_eq!(info.current_version, "0.1.0");
+        assert_eq!(info.latest_version, "v0.2.0");
+        assert_eq!(info.release_name, "Release Title");
+        assert_eq!(info.released_at, "2026-04-25T12:00:00Z");
+        assert_eq!(info.body_excerpt, "Notes");
+        assert_eq!(info.html_url, "https://example.com/r");
+    }
+
+    #[test]
+    fn build_update_info_falls_back_to_tag_when_name_missing() {
+        let mut release = release_fixture("v0.2.0");
+        release.name = None;
+        let info = build_update_info(&release, "0.1.0");
+        assert_eq!(info.release_name, "v0.2.0");
+    }
+
+    #[test]
+    fn build_update_info_falls_back_to_tag_when_name_blank() {
+        let mut release = release_fixture("v0.2.0");
+        release.name = Some("   ".to_string());
+        let info = build_update_info(&release, "0.1.0");
+        assert_eq!(info.release_name, "v0.2.0");
     }
 
     #[test]
