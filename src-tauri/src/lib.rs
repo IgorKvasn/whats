@@ -1,4 +1,5 @@
 mod title_parse;
+mod build_info;
 mod tray;
 mod settings;
 mod ipc;
@@ -59,6 +60,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            crate::ipc::get_build_info,
             crate::ipc::get_settings,
             crate::ipc::set_settings,
             crate::ipc::report_unread,

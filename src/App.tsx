@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getBuildInfo, type BuildInfo } from './buildInfoApi';
 import {
   getSettings,
   previewNotification,
@@ -8,7 +10,17 @@ import {
 } from './settingsApi';
 import './styles.css';
 
+const currentWindowLabel = getCurrentWindow().label;
+
 export default function App() {
+  if (currentWindowLabel === 'about') {
+    return <AboutView />;
+  }
+
+  return <SettingsView />;
+}
+
+function SettingsView() {
   const [settings, setLocal] = useState<Settings | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +43,7 @@ export default function App() {
   if (!settings) return <div className="settings"><p>Loading…</p></div>;
 
   return (
-    <div className="settings">
+    <div className="dialog settings">
       <h1>Settings</h1>
       <label className="row">
         <input
@@ -77,6 +89,30 @@ export default function App() {
         />
         <span>Include message preview</span>
       </label>
+    </div>
+  );
+}
+
+function AboutView() {
+  const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getBuildInfo().then(setBuildInfo).catch((e) => setError(String(e)));
+  }, []);
+
+  if (error) return <div className="dialog"><p className="err">Error: {error}</p></div>;
+  if (!buildInfo) return <div className="dialog"><p>Loading…</p></div>;
+
+  return (
+    <div className="dialog about">
+      <h1>About</h1>
+      <dl className="details">
+        <div className="detail">
+          <dt>Build date and time</dt>
+          <dd>{buildInfo.build_timestamp}</dd>
+        </div>
+      </dl>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 [default]
 description = "Allow whats app commands"
 permissions = [
+  "allow-get-build-info",
   "allow-get-settings",
   "allow-set-settings",
   "allow-report-unread",
@@ -10,6 +11,11 @@ permissions = [
   "allow-preview-sound",
   "allow-open-external",
 ]
+
+[[permission]]
+identifier = "allow-get-build-info"
+description = "Read current build metadata"
+commands.allow = ["get_build_info"]
 
 [[permission]]
 identifier = "allow-get-settings"

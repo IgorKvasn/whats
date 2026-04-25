@@ -18,3 +18,14 @@ describe('linux bundle desktop launchers', () => {
     expect(template).not.toContain('/data/projects/whats');
   });
 });
+
+describe('tauri capabilities', () => {
+  it('allow the dedicated settings and about utility windows', () => {
+    const capability = JSON.parse(
+      readFileSync(new URL('../src-tauri/capabilities/whats.json', import.meta.url), 'utf8'),
+    );
+
+    expect(capability.windows).toContain('settings');
+    expect(capability.windows).toContain('about');
+  });
+});

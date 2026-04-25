@@ -2,6 +2,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const MAIN_LABEL: &str = "main";
 const SETTINGS_LABEL: &str = "settings";
+const ABOUT_LABEL: &str = "about";
 
 pub fn main_in_foreground(app: &AppHandle) -> bool {
     let Some(w) = app.get_webview_window(MAIN_LABEL) else {
@@ -36,22 +37,51 @@ pub fn toggle_main(app: &AppHandle) {
 }
 
 pub fn show_settings(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window(SETTINGS_LABEL) {
+    show_dialog_window(
+        app,
+        SETTINGS_LABEL,
+        "WhatsApp — Settings",
+        480.0,
+        360.0,
+        320.0,
+        240.0,
+    );
+}
+
+pub fn show_about(app: &AppHandle) {
+    show_dialog_window(
+        app,
+        ABOUT_LABEL,
+        "WhatsApp — About",
+        440.0,
+        240.0,
+        320.0,
+        220.0,
+    );
+}
+
+fn show_dialog_window(
+    app: &AppHandle,
+    label: &str,
+    title: &str,
+    width: f64,
+    height: f64,
+    min_width: f64,
+    min_height: f64,
+) {
+    if let Some(w) = app.get_webview_window(label) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
         return;
     }
-    let _ = WebviewWindowBuilder::new(
-        app,
-        SETTINGS_LABEL,
-        WebviewUrl::App("index.html".into()),
-    )
-    .title("WhatsApp — Settings")
-    .inner_size(480.0, 360.0)
-    .min_inner_size(320.0, 240.0)
-    .resizable(true)
-    .build();
+
+    let _ = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+        .title(title)
+        .inner_size(width, height)
+        .min_inner_size(min_width, min_height)
+        .resizable(true)
+        .build();
 }
 
 pub fn install_close_to_tray(app: &AppHandle) {
@@ -70,4 +100,3 @@ pub fn install_close_to_tray(app: &AppHandle) {
         }
     });
 }
-

@@ -1,7 +1,7 @@
 {
   "identifier": "whats-capability",
   "description": "Capability for the WhatsApp shell",
-  "windows": ["main", "settings"],
+  "windows": ["main", "settings", "about"],
   "permissions": [
     "core:default",
     "notification:default",

@@ -33,10 +33,11 @@ pub struct TrayHandle {
 pub fn build_tray(app: &App) -> tauri::Result<TrayHandle> {
     let show = MenuItemBuilder::with_id("show", "Show WhatsApp").build(app)?;
     let settings = MenuItemBuilder::with_id("settings", "Settings…").build(app)?;
+    let about = MenuItemBuilder::with_id("about", "About…").build(app)?;
     let devtools = MenuItemBuilder::with_id("devtools", "Open DevTools").build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
     let menu = MenuBuilder::new(app)
-        .items(&[&show, &settings, &devtools, &quit])
+        .items(&[&show, &settings, &about, &devtools, &quit])
         .build()?;
 
     let icon_bytes = include_bytes!("../icons/tray-normal.png");
@@ -50,6 +51,7 @@ pub fn build_tray(app: &App) -> tauri::Result<TrayHandle> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => crate::windows::show_main(app),
             "settings" => crate::windows::show_settings(app),
+            "about" => crate::windows::show_about(app),
             "devtools" => {
                 if let Some(w) = app.get_webview_window("main") {
                     w.open_devtools();

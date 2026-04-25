@@ -35,6 +35,7 @@ pub fn preview(app: &AppHandle, with_sound: bool) {
 const SOUND_FILE: &str = "/usr/share/sounds/freedesktop/stereo/message-new-instant.oga";
 
 static APP_IMAGE_PATH: OnceLock<Option<PathBuf>> = OnceLock::new();
+const OPEN_ACTION_ID: &str = "open";
 
 fn app_image_path(app: &AppHandle) -> Option<&'static PathBuf> {
     APP_IMAGE_PATH
@@ -51,13 +52,17 @@ fn app_image_path(app: &AppHandle) -> Option<&'static PathBuf> {
         .as_ref()
 }
 
+fn is_open_action_output(line: &str) -> bool {
+    line.trim() == OPEN_ACTION_ID
+}
+
 fn show(app: &AppHandle, title: &str, body: &str, with_sound: bool) {
     let mut cmd = Command::new("notify-send");
     cmd.arg("-a").arg("WhatsApp");
     if let Some(image) = app_image_path(app) {
         cmd.arg(format!("--hint=string:image-path:{}", image.display()));
     }
-    cmd.arg("--action=default=Open")
+    cmd.arg(format!("--action={OPEN_ACTION_ID}=Open"))
         .arg("--")
         .arg(title)
         .arg(body)
@@ -74,8 +79,8 @@ fn show(app: &AppHandle, title: &str, body: &str, with_sound: bool) {
                 if let Some(out) = stdout {
                     let reader = BufReader::new(out);
                     for line in reader.lines().map_while(Result::ok) {
-                        if line.trim() == "default" {
-                            eprintln!("notify: default action invoked, showing main window");
+                        if is_open_action_output(&line) {
+                            eprintln!("notify: open action invoked, showing main window");
                             let _ = app_handle.run_on_main_thread({
                                 let app_handle = app_handle.clone();
                                 move || crate::windows::show_main(&app_handle)
@@ -93,5 +98,18 @@ fn show(app: &AppHandle, title: &str, body: &str, with_sound: bool) {
         if let Err(e) = Command::new("paplay").arg(SOUND_FILE).spawn() {
             eprintln!("notify: paplay failed: {e}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_open_action_output;
+
+    #[test]
+    fn only_open_button_output_activates_window() {
+        assert!(is_open_action_output("open"));
+        assert!(is_open_action_output(" open \n"));
+        assert!(!is_open_action_output("default"));
+        assert!(!is_open_action_output(""));
     }
 }

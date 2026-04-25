@@ -12,6 +12,11 @@ pub struct AppState {
 }
 
 #[tauri::command]
+pub fn get_build_info() -> crate::build_info::BuildInfo {
+    crate::build_info::current_build_info()
+}
+
+#[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Settings {
     *state.settings.lock().unwrap()
 }
