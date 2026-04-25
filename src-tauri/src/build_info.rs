@@ -1,9 +1,11 @@
 use serde::Serialize;
 
 const BUILD_TIMESTAMP: &str = env!("WHATS_BUILD_TIMESTAMP");
+const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct BuildInfo {
+    pub version: String,
     pub build_timestamp: String,
 }
 
@@ -13,6 +15,7 @@ pub fn build_timestamp_text(timestamp: &str) -> String {
 
 pub fn current_build_info() -> BuildInfo {
     BuildInfo {
+        version: PKG_VERSION.to_string(),
         build_timestamp: build_timestamp_text(BUILD_TIMESTAMP),
     }
 }

@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export interface BuildInfo {
+  version: string;
   build_timestamp: string;
 }
 

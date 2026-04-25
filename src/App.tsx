@@ -177,6 +177,10 @@ function AboutView() {
       <h1>About</h1>
       <dl className="details">
         <div className="detail">
+          <dt>Version</dt>
+          <dd>{buildInfo.version}</dd>
+        </div>
+        <div className="detail">
           <dt>Build date and time</dt>
           <dd>{buildInfo.build_timestamp}</dd>
         </div>
