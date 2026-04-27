@@ -19,11 +19,42 @@ vi.mock('node:child_process', async () => {
   };
 });
 
-// Use a promise so the module is imported after mocking
+type ActionInvokedHandler = (notificationId: number, actionKey: string) => void;
+
+const { mockNotifyCall, mockOnSignal, mockRemoveListener, mockGetProxyObject } = vi.hoisted(() => {
+  const mockNotifyCall = vi.fn<(...args: unknown[]) => Promise<number>>();
+  const mockOnSignal = vi.fn<(signal: string, handler: ActionInvokedHandler) => void>();
+  const mockRemoveListener = vi.fn();
+  const mockGetProxyObject = vi.fn();
+  return { mockNotifyCall, mockOnSignal, mockRemoveListener, mockGetProxyObject };
+});
+
+vi.mock('dbus-next', () => {
+  return {
+    sessionBus: () => ({
+      getProxyObject: mockGetProxyObject,
+      disconnect: vi.fn(),
+    }),
+  };
+});
+
 const notificationsModule = import('../src/main/notifications');
 
 beforeEach(() => {
   mockExecFile.mockReset();
+  mockNotifyCall.mockReset();
+  mockOnSignal.mockReset();
+  mockRemoveListener.mockReset();
+  mockGetProxyObject.mockReset();
+
+  mockNotifyCall.mockResolvedValue(42);
+  mockGetProxyObject.mockResolvedValue({
+    getInterface: () => ({
+      Notify: mockNotifyCall,
+      on: mockOnSignal,
+      removeListener: mockRemoveListener,
+    }),
+  });
 });
 
 describe('shouldDispatch', () => {
@@ -77,22 +108,90 @@ describe('isSafeExternalUrl', () => {
   });
 });
 
-describe('isOpenActionOutput', () => {
-  it('only "open" (trimmed) activates window', async () => {
-    const { isOpenActionOutput } = await notificationsModule;
-    expect(isOpenActionOutput('open')).toBe(true);
-    expect(isOpenActionOutput(' open \n')).toBe(true);
-    expect(isOpenActionOutput('default')).toBe(false);
-    expect(isOpenActionOutput('')).toBe(false);
-  });
-});
-
 describe('showNotification', () => {
-  it('calls notify-send with correct arguments', async () => {
+  it('calls D-Bus Notify with correct arguments including actions', async () => {
+    const { showNotification } = await notificationsModule;
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn());
+    await vi.waitFor(() => {
+      expect(mockNotifyCall).toHaveBeenCalledOnce();
+    });
+
+    const args = mockNotifyCall.mock.calls[0];
+    expect(args[0]).toBe('WhatsApp');       // app_name
+    expect(args[1]).toBe(0);                // replaces_id
+    expect(args[2]).toBe('/icons/icon.png'); // icon
+    expect(args[3]).toBe('Alice');           // summary
+    expect(args[4]).toBe('Hello');           // body
+    expect(args[5]).toEqual(['open', 'Open', 'dismiss', 'Dismiss']); // actions
+    expect(args[7]).toBe(-1);               // timeout
+  });
+
+  it('calls onOpen when ActionInvoked fires with "open"', async () => {
+    const { showNotification } = await notificationsModule;
+    const onOpen = vi.fn();
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', onOpen);
+    await vi.waitFor(() => {
+      expect(mockOnSignal).toHaveBeenCalled();
+    });
+
+    const handler = mockOnSignal.mock.calls.find(c => c[0] === 'ActionInvoked')![1];
+    handler(42, 'open');
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it('does not call onOpen when ActionInvoked fires with "dismiss"', async () => {
+    const { showNotification } = await notificationsModule;
+    const onOpen = vi.fn();
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', onOpen);
+    await vi.waitFor(() => {
+      expect(mockOnSignal).toHaveBeenCalled();
+    });
+
+    const handler = mockOnSignal.mock.calls.find(c => c[0] === 'ActionInvoked')![1];
+    handler(42, 'dismiss');
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('cleans up ActionInvoked listener after action is received', async () => {
+    const { showNotification } = await notificationsModule;
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn());
+    await vi.waitFor(() => {
+      expect(mockOnSignal).toHaveBeenCalled();
+    });
+
+    const handler = mockOnSignal.mock.calls.find(c => c[0] === 'ActionInvoked')![1];
+    handler(42, 'open');
+    expect(mockRemoveListener).toHaveBeenCalledWith('ActionInvoked', handler);
+  });
+
+  it('ignores ActionInvoked for different notification IDs', async () => {
+    const { showNotification } = await notificationsModule;
+    const onOpen = vi.fn();
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', onOpen);
+    await vi.waitFor(() => {
+      expect(mockOnSignal).toHaveBeenCalled();
+    });
+
+    const handler = mockOnSignal.mock.calls.find(c => c[0] === 'ActionInvoked')![1];
+    handler(999, 'open');
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(mockRemoveListener).not.toHaveBeenCalled();
+  });
+
+  it('falls back to notify-send without actions when D-Bus fails', async () => {
+    mockGetProxyObject.mockRejectedValue(new Error('D-Bus unavailable'));
     const { showNotification } = await notificationsModule;
     mockExecFile.mockImplementation((_cmd, _args, cb) => cb(null, '', ''));
 
     showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn());
+    await vi.waitFor(() => {
+      expect(mockExecFile).toHaveBeenCalled();
+    });
 
     const notifySendCall = mockExecFile.mock.calls.find((c) => c[0] === 'notify-send');
     expect(notifySendCall).toBeDefined();
@@ -100,63 +199,8 @@ describe('showNotification', () => {
     expect(args).toEqual([
       '--app-name', 'WhatsApp',
       '--icon', '/icons/icon.png',
-      '--wait',
-      '-A', 'open=Open',
-      '-A', 'dismiss=Dismiss',
       '--', 'Alice', 'Hello',
     ]);
-  });
-
-  it('calls onOpen when stdout is "open"', async () => {
-    const { showNotification } = await notificationsModule;
-    mockExecFile.mockImplementation((cmd, _args, cb) => {
-      if (cmd === 'notify-send') cb(null, 'open\n', '');
-    });
-
-    const onOpen = vi.fn();
-    showNotification('Alice', 'Hello', false, '/icons/icon.png', onOpen);
-
-    expect(onOpen).toHaveBeenCalledOnce();
-  });
-
-  it('does not call onOpen when stdout is "dismiss"', async () => {
-    const { showNotification } = await notificationsModule;
-    mockExecFile.mockImplementation((cmd, _args, cb) => {
-      if (cmd === 'notify-send') cb(null, 'dismiss\n', '');
-    });
-
-    const onOpen = vi.fn();
-    showNotification('Alice', 'Hello', false, '/icons/icon.png', onOpen);
-
-    expect(onOpen).not.toHaveBeenCalled();
-  });
-
-  it('does not call onOpen when stdout is empty (timeout/body click)', async () => {
-    const { showNotification } = await notificationsModule;
-    mockExecFile.mockImplementation((cmd, _args, cb) => {
-      if (cmd === 'notify-send') cb(null, '', '');
-    });
-
-    const onOpen = vi.fn();
-    showNotification('Alice', 'Hello', false, '/icons/icon.png', onOpen);
-
-    expect(onOpen).not.toHaveBeenCalled();
-  });
-
-  it('does not call onOpen on notify-send error', async () => {
-    const { showNotification } = await notificationsModule;
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockExecFile.mockImplementation((cmd, _args, cb) => {
-      if (cmd === 'notify-send') {
-        cb(Object.assign(new Error('not found'), { code: 'ENOENT', killed: false, signal: null }), '', '');
-      }
-    });
-
-    const onOpen = vi.fn();
-    showNotification('Alice', 'Hello', false, '/icons/icon.png', onOpen);
-
-    expect(onOpen).not.toHaveBeenCalled();
-    consoleSpy.mockRestore();
   });
 
   it('plays sound when withSound is true', async () => {
