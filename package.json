@@ -2,6 +2,8 @@
   "name": "whats",
   "private": true,
   "version": "0.5.0",
+  "description": "Unofficial desktop client for WhatsApp Web",
+  "author": "Igor Kvasnicka <ikvaso@gmail.com>",
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {

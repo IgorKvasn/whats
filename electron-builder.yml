@@ -7,7 +7,10 @@ linux:
   category: Network;InstantMessaging
   icon: resources/icons
   desktop:
-    StartupWMClass: whats
+    entry:
+      StartupWMClass: whats
+  executableArgs:
+    - --ozone-platform-hint=auto
 deb:
   depends:
     - libnotify-bin

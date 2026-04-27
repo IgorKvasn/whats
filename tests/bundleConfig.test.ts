@@ -16,6 +16,6 @@ describe('electron-builder config', () => {
     const raw = readFileSync(resolve(rootDir, 'electron-builder.yml'), 'utf8');
     const config = parse(raw);
     expect(config.linux?.category).toContain('InstantMessaging');
-    expect(config.linux?.desktop?.StartupWMClass).toBe('whats');
+    expect(config.linux?.desktop?.entry?.StartupWMClass).toBe('whats');
   });
 });
