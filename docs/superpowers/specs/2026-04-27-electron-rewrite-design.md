@@ -206,7 +206,9 @@ Each API file is rewritten to call `window.electronAPI.*` instead of Tauri's `in
 ### `App.tsx`
 
 - View routing changes from Tauri window label to URL query param: `new URLSearchParams(window.location.search).get('view')`
-- Component logic (SettingsView, AboutView, UpdateView) unchanged
+- SettingsView groups notification preview controls together: "Show notifications" → "Include message preview" → "Preview notification" button, then sound controls below
+- SettingsView shows a green "Setting saved" toast (bottom-right, 2 s fade) after any setting is persisted
+- AboutView and UpdateView unchanged
 
 ### `electron.d.ts`
 

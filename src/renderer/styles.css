@@ -135,3 +135,23 @@ button:disabled {
   margin-bottom: 12px;
   line-height: 1.4;
 }
+
+.saved-toast {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: #27ae60;
+  color: #fff;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+
+.saved-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}

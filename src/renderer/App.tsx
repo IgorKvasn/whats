@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import { getBuildInfo, type BuildInfo } from './buildInfoApi';
 import {
@@ -34,6 +34,8 @@ function SettingsView() {
     | { kind: 'up_to_date'; current: string }
     | { kind: 'failed' }
   >({ kind: 'idle' });
+  const [savedVisible, setSavedVisible] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getSettings().then(setLocal).catch((e) => setError(String(e)));
@@ -46,6 +48,9 @@ function SettingsView() {
     setUpdateCheckStatus({ kind: 'idle' });
     try {
       await setSettings(next);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      setSavedVisible(true);
+      savedTimerRef.current = setTimeout(() => setSavedVisible(false), 2000);
     } catch (e) {
       setError(String(e));
     }
@@ -81,6 +86,15 @@ function SettingsView() {
         />
         <span>Show notifications</span>
       </label>
+      <label className="row">
+        <input
+          type="checkbox"
+          checked={settings.includePreview}
+          onChange={(e) => update({ includePreview: e.target.checked })}
+          disabled={!settings.notificationsEnabled}
+        />
+        <span>Include message preview</span>
+      </label>
       <div className="row">
         <button
           type="button"
@@ -108,15 +122,6 @@ function SettingsView() {
           Preview sound
         </button>
       </div>
-      <label className="row">
-        <input
-          type="checkbox"
-          checked={settings.includePreview}
-          onChange={(e) => update({ includePreview: e.target.checked })}
-          disabled={!settings.notificationsEnabled}
-        />
-        <span>Include message preview</span>
-      </label>
       <hr />
       <label className="row">
         <input
@@ -160,6 +165,9 @@ function SettingsView() {
         usage by ~100–200 MB but may make scrolling and animations less smooth.
         Requires restart.
       </p>
+      <div className={`saved-toast ${savedVisible ? 'visible' : ''}`}>
+        Setting saved
+      </div>
     </div>
   );
 }

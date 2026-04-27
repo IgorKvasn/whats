@@ -25,7 +25,8 @@ Run with `npm run dev` from the repo root.
 - [ ] Notification has "Open" and "Dismiss" action buttons.
 - [ ] Click "Open" button → main window shows and focuses.
 - [ ] Click "Dismiss" button → notification closes, app stays in background.
-- [ ] Open Settings (tray → Settings…). Click "Preview notification" → notification appears with action buttons.
+- [ ] Open Settings (tray → Settings…). "Include message preview" checkbox appears directly below "Show notifications", followed by the "Preview notification" button.
+- [ ] Click "Preview notification" → notification appears with action buttons.
 - [ ] Toggle "Show notifications" off → incoming message fires no notification.
 - [ ] Toggle back on, toggle "Play sound" off → notification silent.
 - [ ] Toggle "Include message preview" on → notification body contains first line of message.
@@ -48,4 +49,6 @@ Run with `npm run dev` from the repo root.
 
 ## Settings persistence
 
+- [ ] Change any setting → green "Setting saved" toast appears at bottom-right, fades after ~2 s.
+- [ ] Toggle multiple settings rapidly → toast resets its timer, only one toast visible at a time.
 - [ ] Change any setting. Quit via tray. Relaunch. Setting is preserved.
