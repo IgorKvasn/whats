@@ -26,6 +26,7 @@ export default defineConfig({
           index: 'src/preload/index.ts',
           whatsapp: 'src/preload/whatsapp.ts',
         },
+        external: ['electron'],
         output: {
           format: 'cjs',
         },
