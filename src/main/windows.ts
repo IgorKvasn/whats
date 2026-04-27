@@ -21,7 +21,9 @@ export function showMainWindow(): void {
   if (!mainWindow) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
+  mainWindow.setAlwaysOnTop(true);
   mainWindow.focus();
+  mainWindow.setAlwaysOnTop(false);
 }
 
 export function hideMainWindow(): void {
