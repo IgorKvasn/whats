@@ -29,11 +29,15 @@ import {
 } from './windows';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
-let settings: Settings;
+let settings: Settings = loadSettings(settingsPath);
 let lastNotification: LastNotification | null = null;
 let currentUpdate: UpdateInfo | null = null;
 let trayHandle: TrayHandle | null = null;
 let dialogs: ReturnType<typeof createDialogOpeners>;
+
+if (!settings.hardwareAccelerationEnabled) {
+  app.disableHardwareAcceleration();
+}
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -51,8 +55,6 @@ function getVersion(): string {
 }
 
 async function initialize(): Promise<void> {
-  settings = loadSettings(settingsPath);
-
   // WhatsApp Web rejects Electron's UA; present as plain Chrome.
   app.userAgentFallback = app.userAgentFallback
     .replace(/\s+Electron\/[\w.]+/, '')

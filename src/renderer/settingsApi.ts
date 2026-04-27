@@ -3,6 +3,7 @@ export interface Settings {
   soundEnabled: boolean;
   includePreview: boolean;
   autoUpdateCheckEnabled: boolean;
+  hardwareAccelerationEnabled: boolean;
   updateState: unknown;
 }
 

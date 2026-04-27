@@ -28,6 +28,7 @@ describe('settings', () => {
       soundEnabled: false,
       includePreview: true,
       autoUpdateCheckEnabled: true,
+      hardwareAccelerationEnabled: false,
       updateState: {
         lastCheckedAt: null,
         skippedVersion: null,
@@ -59,8 +60,9 @@ describe('settings', () => {
     expect(existsSync(path)).toBe(true);
   });
 
-  it('defaults have auto-update enabled', () => {
+  it('defaults have auto-update and hardware acceleration enabled', () => {
     expect(DEFAULT_SETTINGS.autoUpdateCheckEnabled).toBe(true);
+    expect(DEFAULT_SETTINGS.hardwareAccelerationEnabled).toBe(true);
     expect(DEFAULT_SETTINGS.updateState.lastCheckedAt).toBeNull();
     expect(DEFAULT_SETTINGS.updateState.skippedVersion).toBeNull();
     expect(DEFAULT_SETTINGS.updateState.consecutiveFailures).toBe(0);
@@ -81,6 +83,7 @@ describe('settings', () => {
     expect(s.soundEnabled).toBe(false);
     expect(s.includePreview).toBe(true);
     expect(s.autoUpdateCheckEnabled).toBe(true);
+    expect(s.hardwareAccelerationEnabled).toBe(true);
     expect(s.updateState.consecutiveFailures).toBe(0);
   });
 
@@ -91,6 +94,7 @@ describe('settings', () => {
       soundEnabled: true,
       includePreview: false,
       autoUpdateCheckEnabled: false,
+      hardwareAccelerationEnabled: false,
       updateState: {
         lastCheckedAt: 1_700_000_000,
         skippedVersion: 'v0.2.0',

@@ -12,6 +12,7 @@ export interface Settings {
   soundEnabled: boolean;
   includePreview: boolean;
   autoUpdateCheckEnabled: boolean;
+  hardwareAccelerationEnabled: boolean;
   updateState: UpdateState;
 }
 
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundEnabled: true,
   includePreview: false,
   autoUpdateCheckEnabled: true,
+  hardwareAccelerationEnabled: true,
   updateState: {
     lastCheckedAt: null,
     skippedVersion: null,
@@ -67,6 +69,10 @@ export function loadSettings(path: string): Settings {
       typeof obj.autoUpdateCheckEnabled === 'boolean'
         ? obj.autoUpdateCheckEnabled
         : DEFAULT_SETTINGS.autoUpdateCheckEnabled,
+    hardwareAccelerationEnabled:
+      typeof obj.hardwareAccelerationEnabled === 'boolean'
+        ? obj.hardwareAccelerationEnabled
+        : DEFAULT_SETTINGS.hardwareAccelerationEnabled,
     updateState: {
       lastCheckedAt:
         typeof updateStateRaw.lastCheckedAt === 'number'

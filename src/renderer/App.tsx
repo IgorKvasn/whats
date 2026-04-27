@@ -145,6 +145,21 @@ function SettingsView() {
           <span className="err">Update check failed. Please try again later.</span>
         </div>
       )}
+      <hr />
+      <h2>Performance</h2>
+      <label className="row">
+        <input
+          type="checkbox"
+          checked={settings.hardwareAccelerationEnabled}
+          onChange={(e) => update({ hardwareAccelerationEnabled: e.target.checked })}
+        />
+        <span>Hardware acceleration (GPU)</span>
+      </label>
+      <p className="hint">
+        Uses the GPU to render the interface. Disabling this reduces memory
+        usage by ~100–200 MB but may make scrolling and animations less smooth.
+        Requires restart.
+      </p>
     </div>
   );
 }
