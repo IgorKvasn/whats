@@ -19,7 +19,7 @@
 #   --dry-run         Print every mutating command, don't run them.
 #   -h, --help        Show this help.
 #
-# Requirements: git, gh (authenticated), node, npm, cargo, dpkg-deb.
+# Requirements: git, gh (authenticated), node, npm, dpkg-deb.
 #
 set -euo pipefail
 
@@ -82,7 +82,7 @@ log "Checking preconditions"
 
 [[ -n "${BUMP}" ]] || die "--bump is required (patch|minor|major|X.Y.Z)"
 
-for cmd in git gh node npm cargo dpkg-deb; do
+for cmd in git gh node npm dpkg-deb; do
   command -v "${cmd}" >/dev/null 2>&1 || die "missing required tool: ${cmd}"
 done
 
@@ -204,32 +204,10 @@ log "Bumping versions to ${new_version}"
 bump_versions() {
   # package.json + package-lock.json (npm version writes both, no tag/commit).
   ( cd "${REPO_ROOT}" && npm version "${new_version}" --no-git-tag-version --allow-same-version >/dev/null )
-
-  # tauri.conf.json: top-level "version" field.
-  python3 - "$REPO_ROOT/src-tauri/tauri.conf.json" "${new_version}" <<'PY'
-import json, sys, pathlib
-path = pathlib.Path(sys.argv[1]); ver = sys.argv[2]
-data = json.loads(path.read_text())
-data["version"] = ver
-path.write_text(json.dumps(data, indent=2) + "\n")
-PY
-
-  # Cargo.toml: only the first `version = "..."` line in [package].
-  python3 - "$REPO_ROOT/src-tauri/Cargo.toml" "${new_version}" <<'PY'
-import re, sys, pathlib
-path = pathlib.Path(sys.argv[1]); ver = sys.argv[2]
-text = path.read_text()
-text, n = re.subn(r'(?m)^version\s*=\s*"[^"]+"', f'version = "{ver}"', text, count=1)
-assert n == 1, "failed to update Cargo.toml version"
-path.write_text(text)
-PY
-
-  # Refresh Cargo.lock for the new package version (offline; no network).
-  ( cd "${REPO_ROOT}/src-tauri" && cargo update -p whats --offline >/dev/null 2>&1 || true )
 }
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
-  printf '   [dry-run] bump versions in package.json, tauri.conf.json, Cargo.toml\n'
+  printf '   [dry-run] bump versions in package.json, package-lock.json\n'
 else
   bump_versions
 fi
@@ -272,13 +250,13 @@ build_args=()
 
 run "bash '${SCRIPT_DIR}/build-deb.sh' ${build_args[*]:-}"
 
-DEB_DIR="${REPO_ROOT}/src-tauri/target/release/bundle/deb"
+DEB_DIR="${REPO_ROOT}/dist"
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   deb_file="${DEB_DIR}/whats_${new_version}_amd64.deb"
   printf '   [dry-run] expecting deb at %s\n' "${deb_file}"
 else
   shopt -s nullglob
-  debs=("${DEB_DIR}"/whats_${new_version}_*.deb)
+  debs=("${DEB_DIR}"/whats*${new_version}*.deb "${DEB_DIR}"/whats*.deb)
   shopt -u nullglob
   [[ "${#debs[@]}" -ge 1 ]] || die "no .deb matching version ${new_version} in ${DEB_DIR}"
   deb_file="${debs[0]}"
@@ -290,7 +268,7 @@ fi
 # ------------------------------------------------------------------
 log "Committing, tagging, pushing"
 
-run "git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock CHANGELOG.md"
+run "git add package.json package-lock.json CHANGELOG.md"
 run "git commit -m 'chore(release): ${tag}'"
 run "git tag -a ${tag} -m '${tag}'"
 run "git push ${REMOTE} ${BRANCH}"

@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 #
-# Build a .deb package of `whats`.
-#
-# Mirrors docs/build-deb.md step by step. Safe to re-run.
+# Build a .deb package of `whats` (Electron).
 #
 # Flags:
-#   --skip-apt     Skip the apt-get install step (Step 1).
-#   --skip-tests   Skip cargo test + npm test (Step 4).
-#   --no-sudo      Don't use sudo for apt-get; assume the caller has root.
+#   --skip-apt     Skip the apt-get install step.
+#   --skip-tests   Skip npm test.
+#   --no-sudo      Don't use sudo for apt-get.
 #   -h, --help     Show this help.
 #
 set -euo pipefail
@@ -20,7 +18,7 @@ SKIP_TESTS=0
 SUDO="sudo"
 
 usage() {
-  sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 for arg in "$@"; do
@@ -39,71 +37,45 @@ cd "${REPO_ROOT}"
 
 # Step 1 — system packages
 if [[ "${SKIP_APT}" -eq 0 ]]; then
-  log "Step 1/6: Installing system packages"
+  log "Step 1/5: Installing system packages"
   ${SUDO} apt-get update
   ${SUDO} apt-get install -y \
-    libwebkit2gtk-4.1-dev \
-    libgtk-3-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev \
-    libsoup-3.0-dev \
-    pkg-config \
-    build-essential \
-    curl \
-    wget \
-    file
+    libnotify-bin \
+    pulseaudio-utils \
+    dpkg \
+    fakeroot
 else
-  log "Step 1/6: Skipping apt-get install (--skip-apt)"
+  log "Step 1/5: Skipping apt-get install (--skip-apt)"
 fi
 
 # Step 2 — toolchain check
-log "Step 2/6: Verifying toolchain"
-if [[ -f "${HOME}/.cargo/env" ]]; then
-  # shellcheck disable=SC1091
-  . "${HOME}/.cargo/env"
-fi
-export PATH="${HOME}/.cargo/bin:${PATH}"
-
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "cargo not found. Install Rust:" >&2
-  echo "  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y" >&2
-  exit 1
- fi
+log "Step 2/5: Verifying toolchain"
 if ! command -v node >/dev/null 2>&1; then
   echo "node not found. Install Node.js >= 20.17 (nvm/fnm/distro)." >&2
   exit 1
 fi
-echo "rustc:  $(rustc --version)"
-echo "cargo:  $(cargo --version)"
 echo "node:   $(node --version)"
 echo "npm:    $(npm --version)"
 
 # Step 3 — npm install
-log "Step 3/6: Installing project dependencies (npm install)"
+log "Step 3/5: Installing project dependencies (npm install)"
 npm install
 
 # Step 4 — tests
 if [[ "${SKIP_TESTS}" -eq 0 ]]; then
-  log "Step 4/6: Running tests and frontend build"
-  cargo test --manifest-path src-tauri/Cargo.toml
+  log "Step 4/5: Running tests and build"
   npm test
   npm run build
 else
-  log "Step 4/6: Skipping tests (--skip-tests)"
+  log "Step 4/5: Skipping tests (--skip-tests)"
+  npm run build
 fi
 
-# Step 5 — bundle .deb
-log "Step 5/6: Building .deb via tauri bundler"
-npx tauri build --bundles deb
+# Step 5 — package .deb
+log "Step 5/5: Packaging .deb via electron-builder"
+npx electron-builder --linux deb
 
-# Step 6 — locate output
-log "Step 6/6: Locating output"
-DEB_DIR="${REPO_ROOT}/src-tauri/target/release/bundle/deb"
-if [[ ! -d "${DEB_DIR}" ]]; then
-  echo "Expected output dir not found: ${DEB_DIR}" >&2
-  exit 1
-fi
-
+DEB_DIR="${REPO_ROOT}/dist"
 shopt -s nullglob
 DEBS=("${DEB_DIR}"/*.deb)
 shopt -u nullglob
