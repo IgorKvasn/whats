@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.3.0 — 2026-04-27
+
+### Features
+
+- group notification preview options and add saved toast
+
+### Chores
+
+- remove yarn.lock
+
+
 ## v1.2.0 — 2026-04-27
 
 ### Features
