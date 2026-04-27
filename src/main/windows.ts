@@ -19,7 +19,7 @@ export function mainInForeground(): boolean {
 
 export function showMainWindow(): void {
   if (!mainWindow) return;
-  mainWindow.restore();
+  if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
 }
@@ -34,7 +34,7 @@ export function toggleMainWindow(): void {
   if (mainWindow.isVisible()) {
     mainWindow.hide();
   } else {
-    mainWindow.restore();
+    if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
   }
