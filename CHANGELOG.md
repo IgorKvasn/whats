@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.4.0 — 2026-04-27
+
+### Bug Fixes
+
+- force main window to foreground on show
+
+
 ## v1.3.0 — 2026-04-27
 
 ### Features
