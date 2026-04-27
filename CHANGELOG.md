@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.2.0 — 2026-04-27
+
+### Features
+
+- replace notify-send with D-Bus for action button support
+- pass icon path to showNotification callers
+- replace electron Notification with notify-send action buttons
+
+### Documentation
+
+- update specs and docs for D-Bus notification implementation
+- add D-Bus notification implementation plan
+- add notification action buttons implementation plan
+- add notification action buttons design spec
+
+### Tests
+
+- rewrite tests for D-Bus notification support
+- update tests for notify-send action buttons
+
+### Build
+
+- externalize electron in preload for Rolldown compatibility
+- fix externalizeDepsPlugin for Vite 8/Rolldown
+- externalize dbus-next in electron-vite config
+- add dbus-next for D-Bus notification support
+
+### Chores
+
+- pin electron version, remove stale package-lock.json, add test files
+
+
 ## v1.1.1 — 2026-04-27
 
 _No notable changes._
