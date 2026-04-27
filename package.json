@@ -1,7 +1,7 @@
 {
   "name": "whats",
   "private": true,
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Unofficial desktop client for WhatsApp Web",
   "author": "Igor Kvasnicka <ikvaso@gmail.com>",
   "type": "module",
@@ -39,9 +39,9 @@
     "vitest": "^4.1.5",
     "yaml": "^2.8.3"
   },
-  "volta":{
-       "node": "20.19.2",
-        "yarn": "1.22.22"	  
+  "volta": {
+    "node": "20.19.2",
+    "yarn": "1.22.22"
   },
   "packageManager": "yarn@3.6.1"
 }

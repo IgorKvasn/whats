@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.0.0 — 2026-04-27
+
+### Features
+
+- add renderer with React views and electron IPC API layer
+- add electron main process entry with IPC handlers and app lifecycle
+- add windows module and preload scripts for dialog and WhatsApp webview
+- add core TDD modules ported from Rust to TypeScript
+
+### Bug Fixes
+
+- disable chromium SUID sandbox for dev compatibility
+
+### Refactor
+
+- replace tauri scaffolding with electron-vite project structure
+
+### Documentation
+
+- add electron rewrite implementation plan
+- add electron rewrite design spec
+
+### Tests
+
+- add component tests and bundle config validation tests
+
+### Build
+
+- upgrade electron stack and fix whatsapp web compatibility
+- update release and build scripts for electron packaging
+
+### Chores
+
+- comitted rest of the files
+- add out/ to gitignore for electron-vite build output
+
+
 ## v0.5.0 — 2026-04-25
 
 ### Chores
