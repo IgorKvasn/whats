@@ -1,0 +1,17 @@
+appId: app.whats.desktop
+productName: whats
+directories:
+  output: dist
+linux:
+  target: deb
+  category: Network;InstantMessaging
+  icon: resources/icons
+  desktop:
+    StartupWMClass: whats
+deb:
+  depends:
+    - libnotify-bin
+    - pulseaudio-utils
+extraResources:
+  - from: resources/icons
+    to: icons

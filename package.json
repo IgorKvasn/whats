@@ -3,35 +3,37 @@
   "private": true,
   "version": "0.5.0",
   "type": "module",
+  "main": "out/main/index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "postinstall": "electron-builder install-app-deps",
+    "package": "electron-vite build && electron-builder --linux deb",
     "test": "vitest run",
     "prepare": "husky"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "semver": "^7.7.2"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.2",
     "@commitlint/config-conventional": "^20.5.0",
-    "@tauri-apps/cli": "^2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/semver": "^7.7.0",
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/ui": "^4.1.5",
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^3.1.0",
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4",
     "vitest": "^4.1.5"
   }
 }
