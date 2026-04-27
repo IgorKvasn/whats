@@ -1,6 +1,10 @@
 import { execFile } from 'node:child_process';
+import { sessionBus } from 'dbus-next';
 
 const SOUND_FILE = '/usr/share/sounds/freedesktop/stereo/message-new-instant.oga';
+
+const DBUS_DEST = 'org.freedesktop.Notifications';
+const DBUS_PATH = '/org/freedesktop/Notifications';
 
 export interface LastNotification {
   time: number;
@@ -28,8 +32,37 @@ export function isSafeExternalUrl(url: string): boolean {
   return scheme === 'http' || scheme === 'https' || scheme === 'mailto' || scheme === 'tel';
 }
 
-export function isOpenActionOutput(line: string): boolean {
-  return line.trim() === 'open';
+interface NotificationsInterface {
+  Notify(
+    appName: string,
+    replacesId: number,
+    icon: string,
+    summary: string,
+    body: string,
+    actions: string[],
+    hints: Record<string, unknown>,
+    timeout: number,
+  ): Promise<number>;
+  on(signal: string, handler: (...args: unknown[]) => void): void;
+  removeListener(signal: string, handler: (...args: unknown[]) => void): void;
+}
+
+function showNotificationFallback(
+  sender: string,
+  body: string,
+  iconPath: string,
+): void {
+  const args = [
+    '--app-name', 'WhatsApp',
+    '--icon', iconPath,
+    '--', sender, body,
+  ];
+
+  execFile('notify-send', args, (err) => {
+    if (err) {
+      console.error('notify: notify-send fallback failed:', err);
+    }
+  });
 }
 
 export function showNotification(
@@ -39,24 +72,29 @@ export function showNotification(
   iconPath: string,
   onOpen: () => void,
 ): void {
-  const args = [
-    '--app-name', 'WhatsApp',
-    '--icon', iconPath,
-    '--wait',
-    '-A', 'open=Open',
-    '-A', 'dismiss=Dismiss',
-    '--', sender, body,
-  ];
+  const bus = sessionBus();
 
-  execFile('notify-send', args, (err, stdout) => {
-    if (err) {
-      console.error('notify: notify-send failed:', err);
-      return;
-    }
-    if (isOpenActionOutput(stdout)) {
-      onOpen();
-    }
-  });
+  bus.getProxyObject(DBUS_DEST, DBUS_PATH)
+    .then((obj) => {
+      const iface = obj.getInterface(DBUS_DEST) as unknown as NotificationsInterface;
+      const actions = ['open', 'Open', 'dismiss', 'Dismiss'];
+
+      return iface.Notify('WhatsApp', 0, iconPath, sender, body, actions, {}, -1)
+        .then((notificationId) => {
+          const handler = (id: number, actionKey: string): void => {
+            if (id !== notificationId) return;
+            iface.removeListener('ActionInvoked', handler);
+            if (actionKey === 'open') {
+              onOpen();
+            }
+          };
+          iface.on('ActionInvoked', handler);
+        });
+    })
+    .catch((err) => {
+      console.error('notify: D-Bus notification failed, falling back to notify-send:', err);
+      showNotificationFallback(sender, body, iconPath);
+    });
 
   if (withSound) {
     execFile('paplay', [SOUND_FILE], (err) => {
