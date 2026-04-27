@@ -22,16 +22,16 @@
 
 ### Task 1: Add `dbus-next` dependency
 
-- [ ] **Step 1: Install dbus-next**
+- [x] **Step 1: Install dbus-next**
 
 Run: `yarn add dbus-next`
 
-- [ ] **Step 2: Verify it installed**
+- [x] **Step 2: Verify it installed**
 
 Run: `ls node_modules/dbus-next/types.d.ts`
 Expected: file exists
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add package.json yarn.lock
@@ -54,7 +54,7 @@ The test file currently mocks `execFile` and checks that `notify-send` is called
 **Files:**
 - Modify: `tests/notifications.test.ts`
 
-- [ ] **Step 1: Rewrite `tests/notifications.test.ts`**
+- [x] **Step 1: Rewrite `tests/notifications.test.ts`**
 
 Replace the entire file with:
 
@@ -287,12 +287,12 @@ describe('showNotification', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run tests/notifications.test.ts`
 Expected: The `showNotification` tests should FAIL because the implementation still uses `execFile('notify-send', ...)` instead of D-Bus. The `shouldDispatch` and `isSafeExternalUrl` tests should still pass (unchanged logic).
 
-- [ ] **Step 3: Commit failing tests**
+- [x] **Step 3: Commit failing tests**
 
 ```bash
 git add tests/notifications.test.ts
@@ -308,7 +308,7 @@ Replace the `showNotification` function to use `dbus-next` for sending notificat
 **Files:**
 - Modify: `src/main/notifications.ts`
 
-- [ ] **Step 1: Rewrite `src/main/notifications.ts`**
+- [x] **Step 1: Rewrite `src/main/notifications.ts`**
 
 Replace the entire file content with:
 
@@ -419,7 +419,7 @@ export function showNotification(
 }
 ```
 
-- [ ] **Step 2: Remove `isOpenActionOutput` from imports in `src/main/index.ts`**
+- [x] **Step 2: Remove `isOpenActionOutput` from imports in `src/main/index.ts`**
 
 In `src/main/index.ts`, line 8, change:
 
@@ -445,17 +445,17 @@ import {
 
 (No change needed — `isOpenActionOutput` is not imported in `index.ts`. Verify with `rg isOpenActionOutput src/`.)
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Run: `npx vitest run tests/notifications.test.ts`
 Expected: All tests PASS.
 
-- [ ] **Step 4: Run full test suite**
+- [x] **Step 4: Run full test suite**
 
 Run: `npx vitest run`
 Expected: All tests pass (no regressions).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/notifications.ts
@@ -468,11 +468,11 @@ git commit -m "feat(notifications): replace notify-send with D-Bus for action bu
 
 Test the notification action buttons work end-to-end in the running app.
 
-- [ ] **Step 1: Build and run the app**
+- [x] **Step 1: Build and run the app**
 
 Run: `yarn dev`
 
-- [ ] **Step 2: Test settings notification preview**
+- [x] **Step 2: Test settings notification preview**
 
 1. Open Settings from the tray menu
 2. Ensure "Show notifications" is checked
@@ -482,13 +482,13 @@ Run: `yarn dev`
 6. Click "Preview notification" again
 7. Click "Dismiss" — verify the notification closes without focusing the app
 
-- [ ] **Step 3: Test with a real WhatsApp message**
+- [x] **Step 3: Test with a real WhatsApp message**
 
 1. With the app running and minimized/unfocused
 2. Send a message to yourself from another device
 3. Verify the notification appears with action buttons
 4. Click "Open" — verify the app window comes to focus
 
-- [ ] **Step 4: Test fallback (optional)**
+- [x] **Step 4: Test fallback (optional)**
 
 Temporarily rename the `dbus-next` module dir to verify the fallback path sends a plain notification without action buttons via `notify-send`.

@@ -22,7 +22,7 @@ A lightweight Electron desktop app that wraps `https://web.whatsapp.com` with a 
 
 - Persistent WhatsApp Web session across restarts
 - System tray with unread count and disconnect status
-- Native desktop notifications (configurable: sound, message preview)
+- Native desktop notifications with action buttons (Open / Dismiss), configurable sound and message preview
 - Close-to-tray behavior
 - Single-instance enforcement
 - Auto-update checking via GitHub releases

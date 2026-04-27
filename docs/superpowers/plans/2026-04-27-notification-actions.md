@@ -1,6 +1,9 @@
 # Notification Action Buttons Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **SUPERSEDED** — This plan was implemented but the `notify-send` approach
+> didn't work (`notify-send` 0.8.6 routes through the XDG Desktop Portal which
+> doesn't support actions). Replaced by
+> `2026-04-27-dbus-notifications.md` which uses `dbus-next` instead.
 
 **Goal:** Replace Electron's `Notification` with `notify-send` to add "Open" and "Dismiss" action buttons to desktop notifications.
 
