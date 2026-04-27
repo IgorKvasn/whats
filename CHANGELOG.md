@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.1 — 2026-04-27
+
+### Bug Fixes
+
+- only call restore() on minimized windows to fix tray show action
+
+### Documentation
+
+- remove tauri references and update readme for electron
+
+
 ## v1.0.0 — 2026-04-27
 
 ### Features
