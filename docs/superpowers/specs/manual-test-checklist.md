@@ -1,6 +1,6 @@
 # WhatsApp Desktop — Manual Test Checklist
 
-Run with `npm run tauri dev` from the repo root.
+Run with `npm run dev` from the repo root.
 
 ## First run
 
@@ -11,7 +11,7 @@ Run with `npm run tauri dev` from the repo root.
 ## Auth persistence
 
 - [ ] Quit via tray → `Quit`. Process exits.
-- [ ] Relaunch `npm run tauri dev`. WhatsApp auto-resumes, no QR.
+- [ ] Relaunch `npm run dev`. WhatsApp auto-resumes, no QR.
 
 ## Unread + tray
 
@@ -40,7 +40,7 @@ Run with `npm run tauri dev` from the repo root.
 
 ## Single-instance
 
-- [ ] While the app is running, launch `npm run tauri dev` again in a second terminal. The existing WhatsApp window focuses; no second process.
+- [ ] While the app is running, launch `npm run dev` again in a second terminal. The existing WhatsApp window focuses; no second process.
 
 ## Settings persistence
 
