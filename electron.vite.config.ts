@@ -25,6 +25,9 @@ export default defineConfig({
           index: 'src/preload/index.ts',
           whatsapp: 'src/preload/whatsapp.ts',
         },
+        output: {
+          format: 'cjs',
+        },
       },
     },
   },

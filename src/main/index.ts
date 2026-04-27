@@ -53,8 +53,13 @@ function getVersion(): string {
 async function initialize(): Promise<void> {
   settings = loadSettings(settingsPath);
 
-  const preloadDialogPath = path.join(__dirname, '../preload/index.js');
-  const preloadWhatsappPath = path.join(__dirname, '../preload/whatsapp.js');
+  // WhatsApp Web rejects Electron's UA; present as plain Chrome.
+  app.userAgentFallback = app.userAgentFallback
+    .replace(/\s+Electron\/[\w.]+/, '')
+    .replace(/\s+whats\/[\w.]+/, '');
+
+  const preloadDialogPath = path.join(__dirname, '../preload/index.cjs');
+  const preloadWhatsappPath = path.join(__dirname, '../preload/whatsapp.cjs');
 
   const mainWindow = new BrowserWindow({
     title: 'WhatsApp',
