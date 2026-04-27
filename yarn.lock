@@ -1980,7 +1980,7 @@ electron-vite@^5.0.0:
     magic-string "^0.30.19"
     picocolors "^1.1.1"
 
-electron@^41.3.0:
+electron@41.3.0:
   version "41.3.0"
   resolved "https://registry.yarnpkg.com/electron/-/electron-41.3.0.tgz#37c3824af97fe86094dc4626db36ebaa2aa34302"
   integrity sha512-2Q5aeocmFdeheZGDUTrAvSR3t+n0c3d104AJWWEnt7syJU0tE4VdibMYaPtQ47QuXSoUf0/xSsfUUvu/uSXIfg==
