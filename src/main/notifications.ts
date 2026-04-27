@@ -1,4 +1,3 @@
-import { Notification } from 'electron';
 import { execFile } from 'node:child_process';
 
 const SOUND_FILE = '/usr/share/sounds/freedesktop/stereo/message-new-instant.oga';
@@ -37,14 +36,27 @@ export function showNotification(
   sender: string,
   body: string,
   withSound: boolean,
-  onClickShowWindow: () => void,
+  iconPath: string,
+  onOpen: () => void,
 ): void {
-  const notification = new Notification({
-    title: sender,
-    body,
+  const args = [
+    '--app-name', 'WhatsApp',
+    '--icon', iconPath,
+    '--wait',
+    '-A', 'open=Open',
+    '-A', 'dismiss=Dismiss',
+    '--', sender, body,
+  ];
+
+  execFile('notify-send', args, (err, stdout) => {
+    if (err) {
+      console.error('notify: notify-send failed:', err);
+      return;
+    }
+    if (isOpenActionOutput(stdout)) {
+      onOpen();
+    }
   });
-  notification.on('click', onClickShowWindow);
-  notification.show();
 
   if (withSound) {
     execFile('paplay', [SOUND_FILE], (err) => {
