@@ -7,7 +7,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: 'src/main/index.ts',
-        external: ['dbus-next'],
+        external: ['electron', 'dbus-next', 'semver'],
       },
     },
     define: {
