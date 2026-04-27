@@ -34,6 +34,7 @@ let lastNotification: LastNotification | null = null;
 let currentUpdate: UpdateInfo | null = null;
 let trayHandle: TrayHandle | null = null;
 let dialogs: ReturnType<typeof createDialogOpeners>;
+let notificationIconPath = '';
 
 if (!settings.hardwareAccelerationEnabled) {
   app.disableHardwareAcceleration();
@@ -90,6 +91,8 @@ async function initialize(): Promise<void> {
     'icons',
   );
 
+  notificationIconPath = path.join(iconDir, 'icon.png');
+
   trayHandle = createTray(iconDir, {
     onShow: showMainWindow,
     onSettings: dialogs.openSettings,
@@ -131,11 +134,11 @@ function registerIpcHandlers(iconDir: string): void {
   });
 
   ipcMain.handle('settings:preview-notification', () => {
-    showNotification('WhatsApp', 'Notification preview', false, showMainWindow);
+    showNotification('WhatsApp', 'Notification preview', false, notificationIconPath, showMainWindow);
   });
 
   ipcMain.handle('settings:preview-sound', () => {
-    showNotification('WhatsApp', 'Sound preview', true, showMainWindow);
+    showNotification('WhatsApp', 'Sound preview', true, notificationIconPath, showMainWindow);
   });
 
   ipcMain.handle('update:get-info', () => {
@@ -178,7 +181,7 @@ function registerIpcHandlers(iconDir: string): void {
     if (!settings.notificationsEnabled) return;
 
     const bodyText = settings.includePreview ? bodyTrunc : '';
-    showNotification(senderTrunc, bodyText, settings.soundEnabled, showMainWindow);
+    showNotification(senderTrunc, bodyText, settings.soundEnabled, notificationIconPath, showMainWindow);
   });
 
   ipcMain.on('whatsapp:unread', (_event, count: number) => {
@@ -275,6 +278,7 @@ function handleFailure(): void {
       'WhatsApp',
       "Couldn't check for updates — please verify your internet connection.",
       false,
+      notificationIconPath,
       showMainWindow,
     );
   }
