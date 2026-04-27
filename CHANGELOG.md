@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.0 — 2026-04-27
+
+### Features
+
+- add hardware acceleration (GPU) toggle
+
+
 ## v1.0.1 — 2026-04-27
 
 ### Bug Fixes
