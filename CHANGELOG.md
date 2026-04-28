@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.1 — 2026-04-28
+
+### Bug Fixes
+
+- filter out UI labels from fallback sender extraction
+
+
 ## v1.5.0 — 2026-04-28
 
 ### Features
