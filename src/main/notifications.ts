@@ -43,9 +43,13 @@ interface NotificationsInterface {
     hints: Record<string, unknown>,
     timeout: number,
   ): Promise<number>;
+  CloseNotification(id: number): Promise<void>;
   on(signal: string, handler: (...args: unknown[]) => void): void;
   removeListener(signal: string, handler: (...args: unknown[]) => void): void;
 }
+
+const activeNotificationIds = new Set<number>();
+let cachedInterface: NotificationsInterface | null = null;
 
 function showNotificationFallback(
   sender: string,
@@ -77,12 +81,15 @@ export function showNotification(
   bus.getProxyObject(DBUS_DEST, DBUS_PATH)
     .then((obj) => {
       const iface = obj.getInterface(DBUS_DEST) as unknown as NotificationsInterface;
+      cachedInterface = iface;
       const actions = ['open', 'Open', 'dismiss', 'Dismiss'];
 
       return iface.Notify('WhatsApp', 0, iconPath, sender, body, actions, {}, -1)
         .then((notificationId) => {
+          activeNotificationIds.add(notificationId);
           const handler = (id: number, actionKey: string): void => {
             if (id !== notificationId) return;
+            activeNotificationIds.delete(notificationId);
             iface.removeListener('ActionInvoked', handler);
             if (actionKey === 'open') {
               onOpen();
@@ -101,4 +108,18 @@ export function showNotification(
       if (err) console.error('notify: paplay failed:', err);
     });
   }
+}
+
+export function closeAllNotifications(): void {
+  if (!cachedInterface || activeNotificationIds.size === 0) return;
+  const iface = cachedInterface;
+  for (const id of activeNotificationIds) {
+    iface.CloseNotification(id).catch(() => {});
+  }
+  activeNotificationIds.clear();
+}
+
+export function resetNotificationState(): void {
+  activeNotificationIds.clear();
+  cachedInterface = null;
 }

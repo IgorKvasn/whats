@@ -5,6 +5,7 @@ import { currentBuildInfo } from './buildInfo';
 import {
   shouldDispatch,
   showNotification,
+  closeAllNotifications,
   isSafeExternalUrl,
   type LastNotification,
 } from './notifications';
@@ -78,6 +79,7 @@ async function initialize(): Promise<void> {
   });
 
   setMainWindow(mainWindow);
+  mainWindow.on('focus', closeAllNotifications);
   mainWindow.loadURL('https://web.whatsapp.com/');
 
   const rendererUrl =

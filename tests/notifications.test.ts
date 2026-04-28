@@ -21,12 +21,13 @@ vi.mock('node:child_process', async () => {
 
 type ActionInvokedHandler = (notificationId: number, actionKey: string) => void;
 
-const { mockNotifyCall, mockOnSignal, mockRemoveListener, mockGetProxyObject } = vi.hoisted(() => {
+const { mockNotifyCall, mockOnSignal, mockRemoveListener, mockCloseNotification, mockGetProxyObject } = vi.hoisted(() => {
   const mockNotifyCall = vi.fn<(...args: unknown[]) => Promise<number>>();
   const mockOnSignal = vi.fn<(signal: string, handler: ActionInvokedHandler) => void>();
   const mockRemoveListener = vi.fn();
+  const mockCloseNotification = vi.fn<(id: number) => Promise<void>>();
   const mockGetProxyObject = vi.fn();
-  return { mockNotifyCall, mockOnSignal, mockRemoveListener, mockGetProxyObject };
+  return { mockNotifyCall, mockOnSignal, mockRemoveListener, mockCloseNotification, mockGetProxyObject };
 });
 
 vi.mock('dbus-next', () => {
@@ -40,17 +41,23 @@ vi.mock('dbus-next', () => {
 
 const notificationsModule = import('../src/main/notifications');
 
-beforeEach(() => {
+beforeEach(async () => {
   mockExecFile.mockReset();
   mockNotifyCall.mockReset();
   mockOnSignal.mockReset();
   mockRemoveListener.mockReset();
+  mockCloseNotification.mockReset();
   mockGetProxyObject.mockReset();
 
+  const { resetNotificationState } = await notificationsModule;
+  resetNotificationState();
+
+  mockCloseNotification.mockResolvedValue(undefined);
   mockNotifyCall.mockResolvedValue(42);
   mockGetProxyObject.mockResolvedValue({
     getInterface: () => ({
       Notify: mockNotifyCall,
+      CloseNotification: mockCloseNotification,
       on: mockOnSignal,
       removeListener: mockRemoveListener,
     }),
@@ -222,5 +229,53 @@ describe('showNotification', () => {
 
     const paplayCall = mockExecFile.mock.calls.find((c) => c[0] === 'paplay');
     expect(paplayCall).toBeUndefined();
+  });
+});
+
+describe('closeAllNotifications', () => {
+  it('calls CloseNotification for all active notifications', async () => {
+    const { showNotification, closeAllNotifications } = await notificationsModule;
+
+    mockNotifyCall.mockResolvedValueOnce(10);
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn());
+    await vi.waitFor(() => {
+      expect(mockNotifyCall).toHaveBeenCalledTimes(1);
+    });
+
+    mockNotifyCall.mockResolvedValueOnce(11);
+    showNotification('Bob', 'Hey', false, '/icons/icon.png', vi.fn());
+    await vi.waitFor(() => {
+      expect(mockNotifyCall).toHaveBeenCalledTimes(2);
+    });
+
+    closeAllNotifications();
+
+    expect(mockCloseNotification).toHaveBeenCalledWith(10);
+    expect(mockCloseNotification).toHaveBeenCalledWith(11);
+    expect(mockCloseNotification).toHaveBeenCalledTimes(2);
+  });
+
+  it('does nothing when no notifications are active', async () => {
+    const { closeAllNotifications } = await notificationsModule;
+
+    closeAllNotifications();
+
+    expect(mockCloseNotification).not.toHaveBeenCalled();
+  });
+
+  it('removes notification from active set when action is invoked', async () => {
+    const { showNotification, closeAllNotifications } = await notificationsModule;
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn());
+    await vi.waitFor(() => {
+      expect(mockOnSignal).toHaveBeenCalled();
+    });
+
+    const handler = mockOnSignal.mock.calls.find(c => c[0] === 'ActionInvoked')![1];
+    handler(42, 'open');
+
+    closeAllNotifications();
+
+    expect(mockCloseNotification).not.toHaveBeenCalled();
   });
 });
