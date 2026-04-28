@@ -15,10 +15,22 @@ function normalizeText(value: unknown): string {
 function readCandidate(doc: Document, selector: string): string {
   const el = doc?.querySelector?.(selector);
   if (!el) return '';
-  return normalizeText(
+  const text = normalizeText(
     (el as HTMLElement).getAttribute?.('title') || (el as HTMLElement).textContent,
   );
+  if (NON_SENDER_LABELS.has(text.toLowerCase())) return '';
+  return text;
 }
+
+const NON_SENDER_LABELS: ReadonlySet<string> = new Set([
+  'profile details',
+  'contact info',
+  'group info',
+  'disappearing messages',
+  'search messages',
+  'business info',
+  'whatsapp',
+]);
 
 type InvokeFn = (command: string, args: Record<string, unknown>) => void;
 
@@ -63,6 +75,7 @@ export function pickFallbackNotificationPayload(
   doc: Document,
 ): { sender: string; body: string | null } | null {
   const sender =
+    readCandidate(doc, '#main header [title]') ||
     readCandidate(doc, 'header [title]') ||
     readCandidate(doc, '[aria-label*="Unread"] [title]') ||
     readCandidate(doc, '[data-testid="cell-frame-title"] [title]');

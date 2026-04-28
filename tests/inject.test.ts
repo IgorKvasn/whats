@@ -128,4 +128,34 @@ describe('fallback payload extraction', () => {
     const doc = makeDocumentFixture({});
     expect(pickFallbackNotificationPayload(doc as unknown as Document)).toBeNull();
   });
+
+  it('ignores UI labels like "Profile details" as sender', () => {
+    const doc = makeDocumentFixture({
+      'header [title]': makeElement({ title: 'Profile details' }),
+      '[aria-label*="Unread"] [title]': makeElement({ title: 'Charlie', textContent: 'Charlie' }),
+      '[aria-label*="Unread"] span[dir="auto"]': makeElement({ textContent: 'hey' }),
+    });
+    expect(pickFallbackNotificationPayload(doc as unknown as Document)).toEqual({
+      sender: 'Charlie',
+      body: 'hey',
+    });
+  });
+
+  it('returns null when only UI labels are found', () => {
+    const doc = makeDocumentFixture({
+      'header [title]': makeElement({ title: 'Profile details' }),
+    });
+    expect(pickFallbackNotificationPayload(doc as unknown as Document)).toBeNull();
+  });
+
+  it('prefers #main header over generic header', () => {
+    const doc = makeDocumentFixture({
+      '#main header [title]': makeElement({ title: 'Dana', textContent: 'Dana' }),
+      'header [title]': makeElement({ title: 'Profile details' }),
+    });
+    expect(pickFallbackNotificationPayload(doc as unknown as Document)).toEqual({
+      sender: 'Dana',
+      body: null,
+    });
+  });
 });
