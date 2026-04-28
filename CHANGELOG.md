@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.0 — 2026-04-28
+
+### Features
+
+- dismiss desktop notifications on window focus
+
+
 ## v1.4.0 — 2026-04-27
 
 ### Bug Fixes
