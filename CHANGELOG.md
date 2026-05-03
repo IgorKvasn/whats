@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.6.0 — 2026-05-03
+
+### Bug Fixes
+
+- harden electron navigation
+
+
 ## v1.5.1 — 2026-04-28
 
 ### Bug Fixes
