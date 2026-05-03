@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://www.electronjs.org/"><img alt="Electron" src="https://img.shields.io/badge/Electron-41.3.0-47848f?logo=electron&logoColor=white"></a>
-  <a href="https://react.dev/"><img alt="React" src="https://img.shields.io/badge/React-19.1.0-149eca?logo=react&logoColor=white"></a>
-  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8-3178c6?logo=typescript&logoColor=white"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-1.8.0-2ea44f">
+  <a href="https://www.electronjs.org/"><img alt="Electron" src="https://img.shields.io/badge/Electron-41.5.0-47848f?logo=electron&logoColor=white"></a>
+  <a href="https://react.dev/"><img alt="React" src="https://img.shields.io/badge/React-19.2.5-149eca?logo=react&logoColor=white"></a>
+  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6.0.3-3178c6?logo=typescript&logoColor=white"></a>
+  <img alt="Version" src="https://img.shields.io/badge/version-1.8.1-2ea44f">
   <a href="LICENSE.md"><img alt="License" src="https://img.shields.io/badge/license-see%20LICENSE.md-6e7781"></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20.deb-fcc624?logo=linux&logoColor=111111">
 </p>
