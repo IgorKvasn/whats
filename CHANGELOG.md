@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.2 — 2026-05-03
+
+### Documentation
+
+- update dependency versions in README
+
+
 ## v1.8.1 — 2026-05-03
 
 ### Documentation
