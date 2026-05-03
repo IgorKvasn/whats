@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.8.1 — 2026-05-03
+
+### Documentation
+
+- refresh readme presentation
+
+### Chores
+
+- align dependency ranges
+- update npm dependencies
+- refresh package lock
+- release script
+
+
 ## v1.8.0 — 2026-05-03
 
 ### Bug Fixes
