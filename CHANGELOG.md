@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.7.0 — 2026-05-03
+
+### Features
+
+- show sender icons in notifications
+
+
 ## v1.6.0 — 2026-05-03
 
 ### Bug Fixes
