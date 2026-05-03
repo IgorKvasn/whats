@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.8.0 — 2026-05-03
+
+### Bug Fixes
+
+- send sender images as D-Bus file URIs
+
+### Documentation
+
+- update notification specs
+
+
 ## v1.7.0 — 2026-05-03
 
 ### Features
