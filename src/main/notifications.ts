@@ -44,8 +44,8 @@ interface NotificationsInterface {
     timeout: number,
   ): Promise<number>;
   CloseNotification(id: number): Promise<void>;
-  on(signal: string, handler: (...args: unknown[]) => void): void;
-  removeListener(signal: string, handler: (...args: unknown[]) => void): void;
+  on(signal: 'ActionInvoked', handler: (id: number, actionKey: string) => void): void;
+  removeListener(signal: 'ActionInvoked', handler: (id: number, actionKey: string) => void): void;
 }
 
 const activeNotificationIds = new Set<number>();

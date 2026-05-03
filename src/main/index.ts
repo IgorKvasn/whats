@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, type IpcMainEvent } from 'electron';
 import path from 'node:path';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import { currentBuildInfo } from './buildInfo';
@@ -28,6 +28,10 @@ import {
   mainInForeground,
   createDialogOpeners,
 } from './windows';
+import {
+  installNavigationGuards,
+  isTrustedWhatsappEvent,
+} from './navigation';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings: Settings = loadSettings(settingsPath);
@@ -75,11 +79,15 @@ async function initialize(): Promise<void> {
       preload: preloadWhatsappPath,
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
   setMainWindow(mainWindow);
   mainWindow.on('focus', closeAllNotifications);
+  installNavigationGuards(mainWindow.webContents, (url) => {
+    void shell.openExternal(url);
+  });
   mainWindow.loadURL('https://web.whatsapp.com/');
 
   const rendererUrl =
@@ -169,6 +177,8 @@ function registerIpcHandlers(iconDir: string): void {
   });
 
   ipcMain.on('whatsapp:notify', (_event, payload: { sender: string; body: string | null }) => {
+    if (!isTrustedWhatsappIpcEvent(_event)) return;
+
     const { sender, body } = payload;
     const senderTrunc = sender.slice(0, 200);
     const bodyTrunc = body ? body.slice(0, 1000) : '';
@@ -187,21 +197,36 @@ function registerIpcHandlers(iconDir: string): void {
   });
 
   ipcMain.on('whatsapp:unread', (_event, count: number) => {
+    if (!isTrustedWhatsappIpcEvent(_event)) return;
+
     if (trayHandle) {
       updateTray(trayHandle, iconDir, count, undefined);
     }
   });
 
   ipcMain.on('whatsapp:disconnected', (_event, disconnected: boolean) => {
+    if (!isTrustedWhatsappIpcEvent(_event)) return;
+
     if (trayHandle) {
       updateTray(trayHandle, iconDir, undefined, disconnected);
     }
   });
 
   ipcMain.on('shell:open-external', (_event, url: string) => {
+    if (!isTrustedWhatsappIpcEvent(_event)) return;
+
     if (isSafeExternalUrl(url)) {
       shell.openExternal(url);
     }
+  });
+}
+
+function isTrustedWhatsappIpcEvent(event: IpcMainEvent): boolean {
+  const mainWindow = getMainWindow();
+  return isTrustedWhatsappEvent({
+    sender: event.sender,
+    senderFrameUrl: event.senderFrame?.url,
+    mainWebContents: mainWindow?.webContents,
   });
 }
 
