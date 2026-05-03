@@ -35,37 +35,66 @@ REMOTE="origin"
 BRANCH="main"
 ASSUME_YES=0
 DRY_RUN=0
+TEMP_FILES=()
 
 usage() { sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
+cleanup() {
+  if [[ "${#TEMP_FILES[@]}" -gt 0 ]]; then
+    rm -f "${TEMP_FILES[@]}"
+  fi
+}
+trap cleanup EXIT
+
+log()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
+warn() { printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
+die()  { printf '\033[1;31mxx %s\033[0m\n' "$*" >&2; exit 1; }
+
+require_value() {
+  local option="$1"
+  local value="${2:-}"
+  [[ -n "${value}" && "${value}" != --* ]] || die "${option} requires a value"
+  printf '%s\n' "${value}"
+}
+
+format_command() {
+  printf '%q' "$1"
+  shift
+  printf ' %q' "$@"
+}
+
+run() {
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    printf '   [dry-run] '
+    format_command "$@"
+    printf '\n'
+  else
+    "$@"
+  fi
+}
+
+version_greater_than() {
+  local candidate="$1"
+  local current="$2"
+  [[ "$(printf '%s\n%s\n' "${current}" "${candidate}" | sort -V | tail -n1)" == "${candidate}" && "${candidate}" != "${current}" ]]
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --bump)        BUMP="${2:-}"; shift 2 ;;
+    --bump)        BUMP="$(require_value "$1" "${2:-}")"; shift 2 ;;
     --draft)       DRAFT=1; shift ;;
     --prerelease)  PRERELEASE=1; shift ;;
     --skip-tests)  SKIP_TESTS=1; shift ;;
     --skip-apt)    SKIP_APT=1; shift ;;
     --no-skip-apt) SKIP_APT=0; shift ;;
-    --remote)      REMOTE="${2:-}"; shift 2 ;;
-    --branch)      BRANCH="${2:-}"; shift 2 ;;
+    --remote)      REMOTE="$(require_value "$1" "${2:-}")"; shift 2 ;;
+    --branch)      BRANCH="$(require_value "$1" "${2:-}")"; shift 2 ;;
     --yes|-y)      ASSUME_YES=1; shift ;;
     --dry-run)     DRY_RUN=1; shift ;;
     -h|--help)     usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
   esac
 done
-
-log()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
-warn() { printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
-die()  { printf '\033[1;31mxx %s\033[0m\n' "$*" >&2; exit 1; }
-
-run() {
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
-    printf '   [dry-run] %s\n' "$*"
-  else
-    eval "$@"
-  fi
-}
 
 confirm() {
   [[ "${ASSUME_YES}" -eq 1 || "${DRY_RUN}" -eq 1 ]] && return 0
@@ -95,7 +124,7 @@ if [[ -n "$(git status --porcelain)" ]]; then
   die "working tree is dirty. Commit or stash before releasing."
 fi
 
-run "git fetch ${REMOTE} --tags --quiet"
+run git fetch "${REMOTE}" --tags --quiet
 
 # ------------------------------------------------------------------
 # Compute new version
@@ -118,6 +147,7 @@ else
   new_version="${maj}.${min}.${pat}"
 fi
 echo "New version:     ${new_version}"
+version_greater_than "${new_version}" "${current_version}" || die "new version ${new_version} must be greater than current version ${current_version}"
 
 tag="v${new_version}"
 if git rev-parse "${tag}" >/dev/null 2>&1; then
@@ -139,7 +169,9 @@ else
 fi
 
 # Collect commits, group by Conventional Commit type.
-mapfile -t commits < <(git log --no-merges --pretty=format:'%s' ${range})
+git_log_args=(git log --no-merges --pretty=format:%s)
+[[ -n "${range}" ]] && git_log_args+=("${range}")
+mapfile -t commits < <("${git_log_args[@]}")
 
 declare -A groups=(
   [feat]="Features"
@@ -171,6 +203,7 @@ done
 
 today="$(date -u +%Y-%m-%d)"
 section_file="$(mktemp)"
+TEMP_FILES+=("${section_file}")
 {
   printf '## %s — %s\n\n' "${tag}" "${today}"
   any=0
@@ -248,7 +281,7 @@ build_args=()
 [[ "${SKIP_TESTS}" -eq 1 ]] && build_args+=(--skip-tests)
 [[ "${SKIP_APT}"   -eq 1 ]] && build_args+=(--skip-apt)
 
-run "bash '${SCRIPT_DIR}/build-deb.sh' ${build_args[*]:-}"
+run bash "${SCRIPT_DIR}/build-deb.sh" "${build_args[@]}"
 
 DEB_DIR="${REPO_ROOT}/dist"
 if [[ "${DRY_RUN}" -eq 1 ]]; then
@@ -256,9 +289,13 @@ if [[ "${DRY_RUN}" -eq 1 ]]; then
   printf '   [dry-run] expecting deb at %s\n' "${deb_file}"
 else
   shopt -s nullglob
-  debs=("${DEB_DIR}"/whats*${new_version}*.deb "${DEB_DIR}"/whats*.deb)
+  debs=("${DEB_DIR}"/whats_"${new_version}"_*.deb)
+  if [[ "${#debs[@]}" -eq 0 ]]; then
+    debs=("${DEB_DIR}"/whats*"${new_version}"*.deb)
+  fi
   shopt -u nullglob
   [[ "${#debs[@]}" -ge 1 ]] || die "no .deb matching version ${new_version} in ${DEB_DIR}"
+  [[ "${#debs[@]}" -eq 1 ]] || die "multiple .deb files match version ${new_version} in ${DEB_DIR}; remove stale artifacts"
   deb_file="${debs[0]}"
   echo "Built: ${deb_file}"
 fi
@@ -268,11 +305,11 @@ fi
 # ------------------------------------------------------------------
 log "Committing, tagging, pushing"
 
-run "git add package.json package-lock.json CHANGELOG.md"
-run "git commit -m 'chore(release): ${tag}'"
-run "git tag -a ${tag} -m '${tag}'"
-run "git push ${REMOTE} ${BRANCH}"
-run "git push ${REMOTE} ${tag}"
+run git add package.json package-lock.json CHANGELOG.md
+run git commit -m "chore(release): ${tag}"
+run git tag -a "${tag}" -m "${tag}"
+run git push "${REMOTE}" "${BRANCH}"
+run git push "${REMOTE}" "${tag}"
 
 # ------------------------------------------------------------------
 # GitHub release
@@ -285,11 +322,11 @@ gh_args=(release create "${tag}" --title "${tag}" --notes-file "${section_file}"
 gh_args+=("${deb_file}")
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
-  printf '   [dry-run] gh %s\n' "${gh_args[*]}"
+  printf '   [dry-run] '
+  format_command gh "${gh_args[@]}"
+  printf '\n'
 else
   gh "${gh_args[@]}"
 fi
-
-rm -f "${section_file}"
 
 printf '\n\033[1;32mRelease %s complete.\033[0m\n' "${tag}"
