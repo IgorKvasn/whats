@@ -54,9 +54,22 @@ function watchTitle(): void {
 function installNotificationShim(): void {
   const shimCode = `
     (function() {
+      function pickNotificationIcon(options) {
+        if (!options) return null;
+        if (typeof options.icon === 'string' && options.icon) return options.icon;
+        if (typeof options.image === 'string' && options.image) return options.image;
+        if (typeof options.badge === 'string' && options.badge) return options.badge;
+        return null;
+      }
+
       function ShimNotification(title, options) {
         var body = options && typeof options.body === 'string' ? options.body : null;
-        window.postMessage({ type: '__whats_notify', title: title, body: body }, '*');
+        window.postMessage({
+          type: '__whats_notify',
+          title: title,
+          body: body,
+          icon: pickNotificationIcon(options),
+        }, '*');
         return { close: function() {} };
       }
       ShimNotification.permission = 'granted';
@@ -78,7 +91,12 @@ function installNotificationShim(): void {
             var orig = reg.showNotification ? reg.showNotification.bind(reg) : null;
             reg.showNotification = function(title, options) {
               var body = options && typeof options.body === 'string' ? options.body : null;
-              window.postMessage({ type: '__whats_notify', title: title, body: body }, '*');
+              window.postMessage({
+                type: '__whats_notify',
+                title: title,
+                body: body,
+                icon: pickNotificationIcon(options),
+              }, '*');
               if (orig) { try { return orig(title, options); } catch(_) {} }
               return Promise.resolve();
             };
@@ -113,6 +131,7 @@ function installNotificationShim(): void {
       safeIpcSend('whatsapp:notify', {
         sender: String(event.data.title || ''),
         body: event.data.body ?? null,
+        icon: typeof event.data.icon === 'string' ? event.data.icon : null,
       });
     }
   });

@@ -5,6 +5,8 @@ import { currentBuildInfo } from './buildInfo';
 import {
   shouldDispatch,
   showNotification,
+  resolveNotificationIconPath,
+  removeCachedNotificationIcon,
   closeAllNotifications,
   isSafeExternalUrl,
   type LastNotification,
@@ -176,7 +178,10 @@ function registerIpcHandlers(iconDir: string): void {
     if (win) win.close();
   });
 
-  ipcMain.on('whatsapp:notify', (_event, payload: { sender: string; body: string | null }) => {
+  ipcMain.on('whatsapp:notify', async (
+    _event,
+    payload: { sender: string; body: string | null; icon?: string | null },
+  ) => {
     if (!isTrustedWhatsappIpcEvent(_event)) return;
 
     const { sender, body } = payload;
@@ -193,7 +198,20 @@ function registerIpcHandlers(iconDir: string): void {
     if (!settings.notificationsEnabled) return;
 
     const bodyText = settings.includePreview ? bodyTrunc : '';
-    showNotification(senderTrunc, bodyText, settings.soundEnabled, notificationIconPath, showMainWindow);
+    const senderIconPath = await resolveNotificationIconPath(
+      payload.icon,
+      notificationIconPath,
+      path.join(app.getPath('userData'), 'notification-icons'),
+    );
+    showNotification(
+      senderTrunc,
+      bodyText,
+      settings.soundEnabled,
+      notificationIconPath,
+      showMainWindow,
+      senderIconPath,
+      () => removeCachedNotificationIcon(senderIconPath, notificationIconPath),
+    );
   });
 
   ipcMain.on('whatsapp:unread', (_event, count: number) => {

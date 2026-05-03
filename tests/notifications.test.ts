@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ExecFileException } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 // @vitest-environment node
 
@@ -20,10 +23,11 @@ vi.mock('node:child_process', async () => {
 });
 
 type ActionInvokedHandler = (notificationId: number, actionKey: string) => void;
+type NotificationClosedHandler = (notificationId: number, reason: number) => void;
 
 const { mockNotifyCall, mockOnSignal, mockRemoveListener, mockCloseNotification, mockGetProxyObject } = vi.hoisted(() => {
   const mockNotifyCall = vi.fn<(...args: unknown[]) => Promise<number>>();
-  const mockOnSignal = vi.fn<(signal: string, handler: ActionInvokedHandler) => void>();
+  const mockOnSignal = vi.fn<(signal: string, handler: ActionInvokedHandler | NotificationClosedHandler) => void>();
   const mockRemoveListener = vi.fn();
   const mockCloseNotification = vi.fn<(id: number) => Promise<void>>();
   const mockGetProxyObject = vi.fn();
@@ -134,6 +138,18 @@ describe('showNotification', () => {
     expect(args[7]).toBe(-1);               // timeout
   });
 
+  it('uses sender icon for D-Bus notification when provided', async () => {
+    const { showNotification } = await notificationsModule;
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn(), '/tmp/alice.png');
+    await vi.waitFor(() => {
+      expect(mockNotifyCall).toHaveBeenCalledOnce();
+    });
+
+    const args = mockNotifyCall.mock.calls[0];
+    expect(args[2]).toBe('/tmp/alice.png');
+  });
+
   it('calls onOpen when ActionInvoked fires with "open"', async () => {
     const { showNotification } = await notificationsModule;
     const onOpen = vi.fn();
@@ -175,6 +191,36 @@ describe('showNotification', () => {
     expect(mockRemoveListener).toHaveBeenCalledWith('ActionInvoked', handler);
   });
 
+  it('removes sender icon after notification action is received', async () => {
+    const { showNotification } = await notificationsModule;
+    const removeIcon = vi.fn();
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn(), '/tmp/alice.png', removeIcon);
+    await vi.waitFor(() => {
+      expect(mockOnSignal).toHaveBeenCalled();
+    });
+
+    const handler = mockOnSignal.mock.calls.find(c => c[0] === 'ActionInvoked')![1] as ActionInvokedHandler;
+    handler(42, 'dismiss');
+
+    expect(removeIcon).toHaveBeenCalledOnce();
+  });
+
+  it('removes sender icon after notification is closed', async () => {
+    const { showNotification } = await notificationsModule;
+    const removeIcon = vi.fn();
+
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn(), '/tmp/alice.png', removeIcon);
+    await vi.waitFor(() => {
+      expect(mockOnSignal).toHaveBeenCalledWith('NotificationClosed', expect.any(Function));
+    });
+
+    const handler = mockOnSignal.mock.calls.find(c => c[0] === 'NotificationClosed')![1] as NotificationClosedHandler;
+    handler(42, 2);
+
+    expect(removeIcon).toHaveBeenCalledOnce();
+  });
+
   it('ignores ActionInvoked for different notification IDs', async () => {
     const { showNotification } = await notificationsModule;
     const onOpen = vi.fn();
@@ -195,7 +241,7 @@ describe('showNotification', () => {
     const { showNotification } = await notificationsModule;
     mockExecFile.mockImplementation((_cmd, _args, cb) => cb(null, '', ''));
 
-    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn());
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn(), '/tmp/alice.png');
     await vi.waitFor(() => {
       expect(mockExecFile).toHaveBeenCalled();
     });
@@ -205,7 +251,7 @@ describe('showNotification', () => {
     const args = notifySendCall![1];
     expect(args).toEqual([
       '--app-name', 'WhatsApp',
-      '--icon', '/icons/icon.png',
+      '--icon', '/tmp/alice.png',
       '--', 'Alice', 'Hello',
     ]);
   });
@@ -229,6 +275,69 @@ describe('showNotification', () => {
 
     const paplayCall = mockExecFile.mock.calls.find((c) => c[0] === 'paplay');
     expect(paplayCall).toBeUndefined();
+  });
+});
+
+describe('resolveNotificationIconPath', () => {
+  it('caches data image icons as local files', async () => {
+    const { resolveNotificationIconPath } = await notificationsModule;
+    const cacheDir = await mkdtemp(path.join(os.tmpdir(), 'whats-icons-'));
+
+    try {
+      const iconPath = await resolveNotificationIconPath(
+        'data:image/png;base64,aGVsbG8=',
+        '/icons/icon.png',
+        cacheDir,
+      );
+
+      expect(iconPath.startsWith(cacheDir)).toBe(true);
+      await expect(readFile(iconPath, 'utf8')).resolves.toBe('hello');
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back when icon candidate is unsupported', async () => {
+    const { resolveNotificationIconPath } = await notificationsModule;
+
+    await expect(
+      resolveNotificationIconPath('file:///tmp/alice.png', '/icons/icon.png', '/tmp/cache'),
+    ).resolves.toBe('/icons/icon.png');
+  });
+
+  it('removes cached notification icon files', async () => {
+    const { resolveNotificationIconPath, removeCachedNotificationIcon } = await notificationsModule;
+    const cacheDir = await mkdtemp(path.join(os.tmpdir(), 'whats-icons-'));
+
+    try {
+      const iconPath = await resolveNotificationIconPath(
+        'data:image/png;base64,aGVsbG8=',
+        '/icons/icon.png',
+        cacheDir,
+      );
+
+      await removeCachedNotificationIcon(iconPath, '/icons/icon.png');
+
+      await expect(readFile(iconPath)).rejects.toThrow();
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not remove the fallback app icon', async () => {
+    const { removeCachedNotificationIcon } = await notificationsModule;
+    const cacheDir = await mkdtemp(path.join(os.tmpdir(), 'whats-icons-'));
+    const fallbackIconPath = path.join(cacheDir, 'icon.png');
+
+    try {
+      await writeFile(fallbackIconPath, 'app-icon');
+
+      await removeCachedNotificationIcon(fallbackIconPath, fallbackIconPath);
+
+      await expect(readFile(fallbackIconPath, 'utf8')).resolves.toBe('app-icon');
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -277,5 +386,28 @@ describe('closeAllNotifications', () => {
     closeAllNotifications();
 
     expect(mockCloseNotification).not.toHaveBeenCalled();
+  });
+
+  it('removes sender icons for all active notifications', async () => {
+    const { showNotification, closeAllNotifications } = await notificationsModule;
+    const removeFirstIcon = vi.fn();
+    const removeSecondIcon = vi.fn();
+
+    mockNotifyCall.mockResolvedValueOnce(10);
+    showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn(), '/tmp/alice.png', removeFirstIcon);
+    await vi.waitFor(() => {
+      expect(mockNotifyCall).toHaveBeenCalledTimes(1);
+    });
+
+    mockNotifyCall.mockResolvedValueOnce(11);
+    showNotification('Bob', 'Hey', false, '/icons/icon.png', vi.fn(), '/tmp/bob.png', removeSecondIcon);
+    await vi.waitFor(() => {
+      expect(mockNotifyCall).toHaveBeenCalledTimes(2);
+    });
+
+    closeAllNotifications();
+
+    expect(removeFirstIcon).toHaveBeenCalledOnce();
+    expect(removeSecondIcon).toHaveBeenCalledOnce();
   });
 });

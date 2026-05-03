@@ -42,14 +42,36 @@ describe('notification shim', () => {
     const invoke = vi.fn();
     const Shim = makeNotificationShim(invoke);
     (Shim as unknown as Function)('Alice', { body: 'hi' });
-    expect(invoke).toHaveBeenCalledWith('notify_message', { sender: 'Alice', body: 'hi' });
+    expect(invoke).toHaveBeenCalledWith('notify_message', {
+      sender: 'Alice',
+      body: 'hi',
+      icon: null,
+    });
+  });
+
+  it('forwards notification icon as sender profile image', () => {
+    const invoke = vi.fn();
+    const Shim = makeNotificationShim(invoke);
+    (Shim as unknown as Function)('Alice', {
+      body: 'hi',
+      icon: 'https://example.test/alice.png',
+    });
+    expect(invoke).toHaveBeenCalledWith('notify_message', {
+      sender: 'Alice',
+      body: 'hi',
+      icon: 'https://example.test/alice.png',
+    });
   });
 
   it('passes null body when options omitted', () => {
     const invoke = vi.fn();
     const Shim = makeNotificationShim(invoke);
     (Shim as unknown as Function)('Bob');
-    expect(invoke).toHaveBeenCalledWith('notify_message', { sender: 'Bob', body: null });
+    expect(invoke).toHaveBeenCalledWith('notify_message', {
+      sender: 'Bob',
+      body: null,
+      icon: null,
+    });
   });
 
   it('exposes permission as granted', () => {

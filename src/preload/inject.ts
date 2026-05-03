@@ -35,15 +35,23 @@ const NON_SENDER_LABELS: ReadonlySet<string> = new Set([
 type InvokeFn = (command: string, args: Record<string, unknown>) => void;
 
 export interface NotificationShim {
-  (title: string, options?: { body?: string }): { close: () => void };
+  (title: string, options?: { body?: string; icon?: string; image?: string; badge?: string }): { close: () => void };
   permission: string;
   requestPermission: (cb?: (result: string) => void) => Promise<string>;
 }
 
 export function makeNotificationShim(invokeFn: InvokeFn): NotificationShim {
-  function Shim(title: string, options?: { body?: string }): { close: () => void } {
+  function Shim(
+    title: string,
+    options?: { body?: string; icon?: string; image?: string; badge?: string },
+  ): { close: () => void } {
     const body = options && typeof options.body === 'string' ? options.body : null;
-    invokeFn('notify_message', { sender: String(title || ''), body });
+    const icon =
+      (options && typeof options.icon === 'string' && options.icon) ||
+      (options && typeof options.image === 'string' && options.image) ||
+      (options && typeof options.badge === 'string' && options.badge) ||
+      null;
+    invokeFn('notify_message', { sender: String(title || ''), body, icon });
     return { close() {} };
   }
   Shim.permission = 'granted';
