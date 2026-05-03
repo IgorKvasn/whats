@@ -22,9 +22,11 @@ Run with `npm run dev` from the repo root.
 ## Notifications
 
 - [ ] Defaults: incoming message → OS notification titled with sender, NO body, default sound plays.
+- [ ] Incoming message notification shows the sender's profile picture when WhatsApp provides one.
 - [ ] Notification has "Open" and "Dismiss" action buttons.
 - [ ] Click "Open" button → main window shows and focuses.
 - [ ] Click "Dismiss" button → notification closes, app stays in background.
+- [ ] After dismissing a profile-picture notification, its cached file under the app user-data `notification-icons` directory is removed.
 - [ ] Open Settings (tray → Settings…). "Include message preview" checkbox appears directly below "Show notifications", followed by the "Preview notification" button.
 - [ ] Click "Preview notification" → notification appears with action buttons.
 - [ ] Toggle "Show notifications" off → incoming message fires no notification.

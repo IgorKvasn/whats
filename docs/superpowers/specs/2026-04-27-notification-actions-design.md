@@ -4,7 +4,9 @@
 
 Use D-Bus (`org.freedesktop.Notifications`) directly via `dbus-next` for desktop
 notifications with "Open" and "Dismiss" action buttons. Falls back to plain
-`notify-send` (no action buttons) when D-Bus is unavailable.
+`notify-send` (no action buttons) when D-Bus is unavailable. Message
+notifications use the sender profile image from WhatsApp's notification
+payload when one is available.
 
 ## Motivation
 
@@ -35,7 +37,7 @@ const obj = await bus.getProxyObject(
 const iface = obj.getInterface('org.freedesktop.Notifications');
 
 const notificationId = await iface.Notify(
-  'WhatsApp', 0, iconPath, sender, body,
+  'WhatsApp', 0, displayIconPath, sender, body,
   ['open', 'Open', 'dismiss', 'Dismiss'],
   {}, -1,
 );
@@ -47,9 +49,26 @@ iface.on('ActionInvoked', (id, actionKey) => {
 });
 ```
 
+For WhatsApp message notifications, the preload shim forwards `options.icon`,
+`options.image`, or `options.badge` from `window.Notification` /
+`ServiceWorkerRegistration.showNotification`. The main process resolves that
+candidate to a local file path before calling `Notify`:
+
+- `data:image/png|jpeg|webp;base64,...` icons are written to
+  `<userData>/notification-icons`.
+- `https://...` icons are fetched, content-type checked, capped at 2 MiB, and
+  written to the same cache directory.
+- Unsupported schemes, failed fetches, oversized images, and unknown content
+  types fall back to the bundled app icon.
+
+Cached sender icon files are removed after the notification lifecycle ends:
+when an action is invoked, when `NotificationClosed` fires, when
+`closeAllNotifications()` closes active notifications, or after the fallback
+`notify-send` process returns. The fallback app icon is never deleted.
+
 **Fallback:** If the D-Bus connection or `Notify` call fails, falls back to
 plain `notify-send` without `-A` or `--wait` flags (shows a notification with
-no action buttons).
+no action buttons), using the same sender icon path when available.
 
 **Sound:** `paplay` via `execFile` remains unchanged and independent of the
 notification mechanism.
@@ -68,15 +87,22 @@ showNotification(
   withSound: boolean,
   iconPath: string,
   onOpen: () => void,
+  senderIconPath?: string | null,
+  cleanupIcon?: () => void | Promise<void>,
 ): void
 ```
+
+`resolveNotificationIconPath()` converts a WhatsApp-provided icon candidate
+into a D-Bus/notify-send-compatible local path. `removeCachedNotificationIcon()`
+removes cached sender icon files and intentionally skips the fallback app icon.
 
 ### Callers in `src/main/index.ts`
 
 All call sites pass `showMainWindow` as the `onOpen` callback and
 `notificationIconPath` (computed from the icon directory) as `iconPath`:
 
-- `whatsapp:notify` handler (message notifications)
+- `whatsapp:notify` handler (message notifications), with sender icon
+  resolution and cleanup
 - `settings:preview-notification` handler
 - `settings:preview-sound` handler
 - `handleFailure` (update check failure notification)
@@ -89,6 +115,10 @@ All call sites pass `showMainWindow` as the `onOpen` callback and
 | Click "Dismiss" button   | Dismiss (do nothing)   |
 | Click notification body  | Dismiss (do nothing)   |
 | Notification times out   | Nothing                |
+
+All D-Bus close/action paths remove cached sender icon files for message
+notifications. Fallback `notify-send` cleanup happens when the spawned command
+returns because that path has no reliable dismissal signal.
 
 ### Build configuration
 
@@ -109,6 +139,9 @@ correctly with Vite 8 / Rolldown.
   not, wrong notification ID is ignored, listener is cleaned up).
 - Test fallback to `notify-send` when D-Bus connection fails.
 - `execFile` mock retained for `paplay` sound tests.
+- Test sender icon forwarding, local cache creation, fallback behavior, and
+  cached icon removal on notification action, close, explicit close-all, and
+  direct removal helper calls.
 
 ## Out of scope
 
@@ -119,3 +152,4 @@ correctly with Vite 8 / Rolldown.
 ## Status
 
 **Implemented** — 2026-04-27. See commits `1c565bc` through `4ef6ab6`.
+Sender profile icons and cached icon cleanup added in `d662414`.

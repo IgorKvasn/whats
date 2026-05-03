@@ -19,7 +19,7 @@ whats/
 │   │   ├── settings.ts              # JSON persistence to userData
 │   │   ├── updater.ts               # GitHub API polling, semver comparison
 │   │   ├── tray.ts                  # System tray icon + menu + state machine
-│   │   ├── notifications.ts         # Electron Notification + paplay for sound
+│   │   ├── notifications.ts         # D-Bus notifications + paplay for sound
 │   │   ├── windows.ts              # Window management (main + dialogs)
 │   │   ├── buildInfo.ts            # Version + build timestamp
 │   │   └── titleParse.ts           # Unread count extraction from title string
@@ -79,7 +79,7 @@ All communication between renderer/preload and main process uses typed IPC chann
 
 | Channel | Direction | Purpose | Payload |
 |---|---|---|---|
-| `whatsapp:notify` | preload→main | Dispatch native notification | `{title: string, body: string, tag?: string}` |
+| `whatsapp:notify` | preload→main | Dispatch native notification | `{sender: string, body: string \| null, icon?: string \| null}` |
 | `whatsapp:unread` | preload→main | Report unread count | `number` |
 | `whatsapp:disconnected` | preload→main | Report connection state | `boolean` |
 
@@ -131,10 +131,18 @@ All communication between renderer/preload and main process uses typed IPC chann
 
 ### `notifications.ts` — Native Notifications
 
-- Uses Electron's `Notification` class for display
-- Click handler: focuses and shows the main window
+- Uses `org.freedesktop.Notifications` over D-Bus via `dbus-next`
+- Adds "Open" and "Dismiss" action buttons
+- "Open" action focuses and shows the main window
 - Sound: `child_process.execFile('paplay', [soundPath])`
 - Deduplication: suppresses duplicate notifications within a short time window (same logic as current Rust `should_dispatch`)
+- Message notifications use a sender profile image when WhatsApp provides one
+  through `options.icon`, `options.image`, or `options.badge`
+- Remote/data sender icons are cached under `<userData>/notification-icons`,
+  passed to D-Bus/notify-send as local file paths, and removed when the
+  notification action/close lifecycle completes
+- Falls back to plain `notify-send` without action buttons when D-Bus is
+  unavailable
 
 ### `windows.ts` — Window Management
 
@@ -169,7 +177,7 @@ Pure functions used by both preload and main process (and imported by tests):
 
 Runs in the context of the WhatsApp Web page. Responsibilities:
 
-1. **Notification interception**: Injects a script into the page world (via `webFrame.executeJavaScript` or a script element) that patches `window.Notification` to route notifications to the main process through a bridge exposed by `contextBridge`.
+1. **Notification interception**: Injects a script into the page world (via `webFrame.executeJavaScript`) that patches `window.Notification` and `ServiceWorkerRegistration.showNotification` to route notifications to the main process. It forwards sender, body, and the best available profile image candidate from `options.icon`, `options.image`, or `options.badge`.
 
 2. **Title watching**: Observes `document.title` changes (MutationObserver on `<title>` element or polling interval). Parses unread count and sends to main process.
 
@@ -229,18 +237,18 @@ All tests use Vitest. The Rust unit tests are ported 1:1 to TypeScript.
 
 | Test File | Tests | Source |
 |---|---|---|
-| `tests/inject.test.ts` | 18 | Ported from current `tests/inject.test.js` — pure function tests for `parseUnread`, `makeNotificationShim`, `shouldNotifyFromUnreadDelta`, `pickFallbackNotificationPayload` |
+| `tests/inject.test.ts` | 22 | Ported from current `tests/inject.test.js` — pure function tests for `parseUnread`, `makeNotificationShim`, `shouldNotifyFromUnreadDelta`, `pickFallbackNotificationPayload`, and notification icon forwarding |
 | `tests/settingsView.test.tsx` | 3 | Adapted — mocks `window.electronAPI` instead of `@tauri-apps/api` |
 | `tests/updateView.test.tsx` | 3 | Adapted — mocks `window.electronAPI` instead of `@tauri-apps/api` |
 | `tests/bundleConfig.test.ts` | 2 | Rewritten to verify `electron-builder.yml` (deb target, desktop category) |
-| `tests/notifications.test.ts` | 7 | Ported from Rust `ipc.rs` + `notify.rs` — `shouldDispatch` dedup logic, action parsing |
+| `tests/notifications.test.ts` | 25 | D-Bus notification behavior, action handling, fallback, sound, dedup logic, sender icon resolution, and cached icon cleanup |
 | `tests/settings.test.ts` | 7 | Ported from Rust `settings.rs` — load/save, JSON round-trip, corruption handling, atomic writes |
 | `tests/updater.test.ts` | 14 | Ported from Rust `updater.rs` — version comparison, update decision, body excerpt, throttle |
 | `tests/tray.test.ts` | 3 | Ported from Rust `tray.rs` — state derivation (unread count, disconnected flag) |
 | `tests/buildInfo.test.ts` | 2 | Ported from Rust `build_info.rs` — timestamp formatting |
 | `tests/titleParse.test.ts` | 8 | Ported from Rust `title_parse.rs` — title parsing for unread count |
 
-Total: ~67 tests, matching current coverage.
+Total: ~99 tests.
 
 Integration-level concerns (actual window creation, tray rendering, IPC wiring) are not unit-tested, matching the current approach.
 
