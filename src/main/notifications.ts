@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { sessionBus } from 'dbus-next';
+import { pathToFileURL } from 'node:url';
+import { sessionBus, Variant } from 'dbus-next';
 
 const SOUND_FILE = '/usr/share/sounds/freedesktop/stereo/message-new-instant.oga';
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
@@ -102,8 +103,15 @@ export function showNotification(
       const iface = obj.getInterface(DBUS_DEST) as unknown as NotificationsInterface;
       cachedInterface = iface;
       const actions = ['open', 'Open', 'dismiss', 'Dismiss'];
+      const senderIconUri = senderIconPath ? pathToFileURL(senderIconPath).href : null;
+      const hints = senderIconPath
+        ? {
+            'image-path': new Variant('s', senderIconUri),
+            image_path: new Variant('s', senderIconUri),
+          }
+        : {};
 
-      return iface.Notify('WhatsApp', 0, displayIconPath, sender, body, actions, {}, -1)
+      return iface.Notify('WhatsApp', 0, iconPath, sender, body, actions, hints, -1)
         .then((notificationId) => {
           activeNotificationIds.add(notificationId);
           const actionHandler = (id: number, actionKey: string): void => {

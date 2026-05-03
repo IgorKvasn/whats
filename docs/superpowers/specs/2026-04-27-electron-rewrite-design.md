@@ -139,8 +139,9 @@ All communication between renderer/preload and main process uses typed IPC chann
 - Message notifications use a sender profile image when WhatsApp provides one
   through `options.icon`, `options.image`, or `options.badge`
 - Remote/data sender icons are cached under `<userData>/notification-icons`,
-  passed to D-Bus/notify-send as local file paths, and removed when the
-  notification action/close lifecycle completes
+  passed to D-Bus as `file://` URI `image-path` / `image_path` hints, passed to
+  `notify-send` fallback as local file paths, and removed when the notification
+  action/close lifecycle completes
 - Falls back to plain `notify-send` without action buttons when D-Bus is
   unavailable
 

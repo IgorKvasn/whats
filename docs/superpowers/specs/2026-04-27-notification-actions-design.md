@@ -27,7 +27,8 @@ Uses `dbus-next` to connect to the session bus and call `Notify` with action
 buttons:
 
 ```ts
-import { sessionBus } from 'dbus-next';
+import { pathToFileURL } from 'node:url';
+import { sessionBus, Variant } from 'dbus-next';
 
 const bus = sessionBus();
 const obj = await bus.getProxyObject(
@@ -36,10 +37,17 @@ const obj = await bus.getProxyObject(
 );
 const iface = obj.getInterface('org.freedesktop.Notifications');
 
+const hints = senderIconPath
+  ? {
+      'image-path': new Variant('s', pathToFileURL(senderIconPath).href),
+      image_path: new Variant('s', pathToFileURL(senderIconPath).href),
+    }
+  : {};
+
 const notificationId = await iface.Notify(
-  'WhatsApp', 0, displayIconPath, sender, body,
+  'WhatsApp', 0, iconPath, sender, body,
   ['open', 'Open', 'dismiss', 'Dismiss'],
-  {}, -1,
+  hints, -1,
 );
 
 iface.on('ActionInvoked', (id, actionKey) => {
@@ -58,6 +66,10 @@ candidate to a local file path before calling `Notify`:
   `<userData>/notification-icons`.
 - `https://...` icons are fetched, content-type checked, capped at 2 MiB, and
   written to the same cache directory.
+- D-Bus keeps the bundled app icon in the `app_icon` argument and sends the
+  sender image through both `image-path` and deprecated `image_path` hints as
+  `file://` URIs. Plain filesystem paths are not sufficient for real
+  notification servers.
 - Unsupported schemes, failed fetches, oversized images, and unknown content
   types fall back to the bundled app icon.
 
@@ -68,7 +80,7 @@ when an action is invoked, when `NotificationClosed` fires, when
 
 **Fallback:** If the D-Bus connection or `Notify` call fails, falls back to
 plain `notify-send` without `-A` or `--wait` flags (shows a notification with
-no action buttons), using the same sender icon path when available.
+no action buttons), using the same sender icon local path when available.
 
 **Sound:** `paplay` via `execFile` remains unchanged and independent of the
 notification mechanism.
@@ -93,8 +105,10 @@ showNotification(
 ```
 
 `resolveNotificationIconPath()` converts a WhatsApp-provided icon candidate
-into a D-Bus/notify-send-compatible local path. `removeCachedNotificationIcon()`
-removes cached sender icon files and intentionally skips the fallback app icon.
+into a local cache path. D-Bus callers convert that path to a `file://` URI for
+`image-path` / `image_path` hints; `notify-send` fallback uses the local path
+directly. `removeCachedNotificationIcon()` removes cached sender icon files and
+intentionally skips the fallback app icon.
 
 ### Callers in `src/main/index.ts`
 
@@ -134,7 +148,8 @@ correctly with Vite 8 / Rolldown.
 
 - Mock `dbus-next` with `vi.mock('dbus-next', ...)` providing a fake
   `sessionBus` that returns mock `getProxyObject` / `getInterface`.
-- Test that `Notify` is called with correct args including actions array.
+- Test that `Notify` is called with correct args including actions array and
+  sender image `file://` URI hints.
 - Test `ActionInvoked` signal handling (open triggers `onOpen`, dismiss does
   not, wrong notification ID is ignored, listener is cleaned up).
 - Test fallback to `notify-send` when D-Bus connection fails.

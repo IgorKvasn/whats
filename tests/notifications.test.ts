@@ -35,7 +35,18 @@ const { mockNotifyCall, mockOnSignal, mockRemoveListener, mockCloseNotification,
 });
 
 vi.mock('dbus-next', () => {
+  class MockVariant {
+    signature: string;
+    value: unknown;
+
+    constructor(signature: string, value: unknown) {
+      this.signature = signature;
+      this.value = value;
+    }
+  }
+
   return {
+    Variant: MockVariant,
     sessionBus: () => ({
       getProxyObject: mockGetProxyObject,
       disconnect: vi.fn(),
@@ -138,7 +149,7 @@ describe('showNotification', () => {
     expect(args[7]).toBe(-1);               // timeout
   });
 
-  it('uses sender icon for D-Bus notification when provided', async () => {
+  it('uses bundled icon as app icon and sender icon file URI as D-Bus image hint', async () => {
     const { showNotification } = await notificationsModule;
 
     showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn(), '/tmp/alice.png');
@@ -147,7 +158,17 @@ describe('showNotification', () => {
     });
 
     const args = mockNotifyCall.mock.calls[0];
-    expect(args[2]).toBe('/tmp/alice.png');
+    expect(args[2]).toBe('/icons/icon.png');
+    expect(args[6]).toEqual({
+      'image-path': expect.objectContaining({
+        signature: 's',
+        value: 'file:///tmp/alice.png',
+      }),
+      image_path: expect.objectContaining({
+        signature: 's',
+        value: 'file:///tmp/alice.png',
+      }),
+    });
   });
 
   it('calls onOpen when ActionInvoked fires with "open"', async () => {
