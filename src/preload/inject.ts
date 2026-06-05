@@ -82,18 +82,24 @@ export function shouldNotifyFromUnreadDelta(details: UnreadDeltaDetails): boolea
 export function pickFallbackNotificationPayload(
   doc: Document,
 ): { sender: string; body: string | null } | null {
-  const sender =
-    readCandidate(doc, '#main header [title]') ||
-    readCandidate(doc, 'header [title]') ||
+  const unreadSender =
     readCandidate(doc, '[aria-label*="Unread"] [title]') ||
     readCandidate(doc, '[data-testid="cell-frame-title"] [title]');
+  if (unreadSender) {
+    return {
+      sender: unreadSender,
+      body: readCandidate(doc, '[aria-label*="Unread"] span[dir="auto"]') || null,
+    };
+  }
 
-  if (!sender) return null;
+  const activeSender =
+    readCandidate(doc, '#main header [title]') ||
+    readCandidate(doc, 'header [title]');
 
-  const body =
-    readCandidate(doc, '[data-pre-plain-text] span[dir="auto"]') ||
-    readCandidate(doc, '[aria-label*="Unread"] span[dir="auto"]') ||
-    null;
+  if (!activeSender) return null;
 
-  return { sender, body };
+  return {
+    sender: activeSender,
+    body: readCandidate(doc, '[data-pre-plain-text] span[dir="auto"]') || null,
+  };
 }

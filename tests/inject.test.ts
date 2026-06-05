@@ -135,6 +135,19 @@ describe('fallback payload extraction', () => {
     });
   });
 
+  it('prefers unread chat row over stale active conversation content', () => {
+    const doc = makeDocumentFixture({
+      '#main header [title]': makeElement({ title: 'Alice', textContent: 'Alice' }),
+      '[data-pre-plain-text] span[dir="auto"]': makeElement({ textContent: 'old message' }),
+      '[aria-label*="Unread"] [title]': makeElement({ title: 'Bob', textContent: 'Bob' }),
+      '[aria-label*="Unread"] span[dir="auto"]': makeElement({ textContent: 'new message' }),
+    });
+    expect(pickFallbackNotificationPayload(doc as unknown as Document)).toEqual({
+      sender: 'Bob',
+      body: 'new message',
+    });
+  });
+
   it('falls back to unread chat row', () => {
     const doc = makeDocumentFixture({
       '[aria-label*="Unread"] [title]': makeElement({ title: 'Bob', textContent: 'Bob' }),
