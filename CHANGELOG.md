@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.3 — 2026-06-05
+
+### Bug Fixes
+
+- correct unread fallback notification payload
+
+
 ## v1.8.2 — 2026-05-03
 
 ### Documentation
