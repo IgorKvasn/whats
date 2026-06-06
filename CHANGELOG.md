@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.9.1 — 2026-06-06
+
+### Build
+
+- reduce deb package size
+
+
 ## v1.9.0 — 2026-06-06
 
 ### Bug Fixes
