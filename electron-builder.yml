@@ -5,12 +5,15 @@ directories:
 linux:
   target: deb
   category: Network;InstantMessaging
+  electronLanguages:
+    - en-US
   icon: resources/icons
   desktop:
     entry:
       StartupWMClass: whats
   executableArgs:
     - --ozone-platform-hint=auto
+compression: maximum
 deb:
   depends:
     - libnotify-bin
