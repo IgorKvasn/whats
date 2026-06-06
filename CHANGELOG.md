@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.9.0 — 2026-06-06
+
+### Bug Fixes
+
+- repair npm lockfile metadata
+
+### Documentation
+
+- add license TLDR summary
+
+### CI
+
+- pin npm version for installs
+- add github automation workflows
+
+### Chores
+
+- update package manifest dependencies
+- update npm dependencies
+- use default npm registry
+- use default npm registry
+
+### Other
+
+- Update LICENSE.md
+
+
 ## v1.8.3 — 2026-06-05
 
 ### Bug Fixes
