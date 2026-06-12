@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { loadSettings, saveSettings, DEFAULT_SETTINGS, type Settings } from '../src/main/settings';
+import {
+  loadSettings,
+  saveSettings,
+  shouldShowOnLaunch,
+  DEFAULT_SETTINGS,
+  type Settings,
+} from '../src/main/settings';
 
 let testDir: string;
 
@@ -29,6 +35,7 @@ describe('settings', () => {
       includePreview: true,
       autoUpdateCheckEnabled: true,
       hardwareAccelerationEnabled: false,
+      startMinimizedToTray: true,
       updateState: {
         lastCheckedAt: null,
         skippedVersion: null,
@@ -84,6 +91,7 @@ describe('settings', () => {
     expect(s.includePreview).toBe(true);
     expect(s.autoUpdateCheckEnabled).toBe(true);
     expect(s.hardwareAccelerationEnabled).toBe(true);
+    expect(s.startMinimizedToTray).toBe(false);
     expect(s.updateState.consecutiveFailures).toBe(0);
   });
 
@@ -95,6 +103,7 @@ describe('settings', () => {
       includePreview: false,
       autoUpdateCheckEnabled: false,
       hardwareAccelerationEnabled: false,
+      startMinimizedToTray: true,
       updateState: {
         lastCheckedAt: 1_700_000_000,
         skippedVersion: 'v0.2.0',
@@ -104,5 +113,15 @@ describe('settings', () => {
     saveSettings(path, s);
     const loaded = loadSettings(path);
     expect(loaded).toEqual(s);
+  });
+});
+
+describe('shouldShowOnLaunch', () => {
+  it('shows the window when startMinimizedToTray is false', () => {
+    expect(shouldShowOnLaunch({ ...DEFAULT_SETTINGS, startMinimizedToTray: false })).toBe(true);
+  });
+
+  it('hides the window when startMinimizedToTray is true', () => {
+    expect(shouldShowOnLaunch({ ...DEFAULT_SETTINGS, startMinimizedToTray: true })).toBe(false);
   });
 });

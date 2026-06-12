@@ -13,6 +13,7 @@ export interface Settings {
   includePreview: boolean;
   autoUpdateCheckEnabled: boolean;
   hardwareAccelerationEnabled: boolean;
+  startMinimizedToTray: boolean;
   updateState: UpdateState;
 }
 
@@ -22,12 +23,17 @@ export const DEFAULT_SETTINGS: Settings = {
   includePreview: false,
   autoUpdateCheckEnabled: true,
   hardwareAccelerationEnabled: true,
+  startMinimizedToTray: false,
   updateState: {
     lastCheckedAt: null,
     skippedVersion: null,
     consecutiveFailures: 0,
   },
 };
+
+export function shouldShowOnLaunch(settings: Settings): boolean {
+  return !settings.startMinimizedToTray;
+}
 
 export function loadSettings(path: string): Settings {
   let raw: string;
@@ -73,6 +79,10 @@ export function loadSettings(path: string): Settings {
       typeof obj.hardwareAccelerationEnabled === 'boolean'
         ? obj.hardwareAccelerationEnabled
         : DEFAULT_SETTINGS.hardwareAccelerationEnabled,
+    startMinimizedToTray:
+      typeof obj.startMinimizedToTray === 'boolean'
+        ? obj.startMinimizedToTray
+        : DEFAULT_SETTINGS.startMinimizedToTray,
     updateState: {
       lastCheckedAt:
         typeof updateStateRaw.lastCheckedAt === 'number'

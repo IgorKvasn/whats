@@ -27,6 +27,7 @@ beforeEach(() => {
     includePreview: false,
     autoUpdateCheckEnabled: true,
     hardwareAccelerationEnabled: true,
+    startMinimizedToTray: false,
     updateState: {},
   });
   mockElectronAPI.setSettings.mockResolvedValue(undefined);

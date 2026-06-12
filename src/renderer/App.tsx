@@ -165,6 +165,20 @@ function SettingsView() {
         usage by ~100–200 MB but may make scrolling and animations less smooth.
         Requires restart.
       </p>
+      <hr />
+      <h2>Startup</h2>
+      <label className="row">
+        <input
+          type="checkbox"
+          checked={settings.startMinimizedToTray}
+          onChange={(e) => update({ startMinimizedToTray: e.target.checked })}
+        />
+        <span>Start minimized to tray</span>
+      </label>
+      <p className="hint">
+        Launches without showing the window. The app keeps running in the
+        background and the window opens when you click the tray icon.
+      </p>
       <div className={`saved-toast ${savedVisible ? 'visible' : ''}`}>
         Setting saved
       </div>

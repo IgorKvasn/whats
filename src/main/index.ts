@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, type IpcMainEvent } from 'electron';
 import path from 'node:path';
-import { loadSettings, saveSettings, type Settings } from './settings';
+import { loadSettings, saveSettings, shouldShowOnLaunch, type Settings } from './settings';
 import { currentBuildInfo } from './buildInfo';
 import {
   shouldDispatch,
@@ -77,6 +77,7 @@ async function initialize(): Promise<void> {
     height: 800,
     minWidth: 600,
     minHeight: 400,
+    show: false,
     webPreferences: {
       preload: preloadWhatsappPath,
       contextIsolation: true,
@@ -84,6 +85,10 @@ async function initialize(): Promise<void> {
       sandbox: true,
     },
   });
+
+  if (shouldShowOnLaunch(settings)) {
+    mainWindow.show();
+  }
 
   setMainWindow(mainWindow);
   mainWindow.on('focus', closeAllNotifications);

@@ -4,6 +4,7 @@ export interface Settings {
   includePreview: boolean;
   autoUpdateCheckEnabled: boolean;
   hardwareAccelerationEnabled: boolean;
+  startMinimizedToTray: boolean;
   updateState: unknown;
 }
 
