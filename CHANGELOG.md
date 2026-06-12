@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.10.0 — 2026-06-12
+
+### Features
+
+- add start-minimized-to-tray option
+
+
 ## v1.9.1 — 2026-06-06
 
 ### Build
