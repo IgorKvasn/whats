@@ -24,6 +24,7 @@ export function showMainWindow(): void {
   mainWindow.setAlwaysOnTop(true);
   mainWindow.focus();
   mainWindow.setAlwaysOnTop(false);
+  repaintMainWindow();
 }
 
 export function hideMainWindow(): void {
@@ -39,7 +40,21 @@ export function toggleMainWindow(): void {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
+    repaintMainWindow();
   }
+}
+
+// Hidden Electron windows can lose their composited frame; force Chromium to
+// repaint after the window becomes visible to avoid a blank/white screen.
+// One synchronous invalidate plus one on the next event-loop tick covers the
+// case where the surface is not yet ready at show() time.
+function repaintMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.invalidate();
+  setImmediate(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.invalidate();
+  });
 }
 
 interface DialogOptions {

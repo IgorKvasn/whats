@@ -78,11 +78,16 @@ async function initialize(): Promise<void> {
     minWidth: 600,
     minHeight: 400,
     show: false,
+    backgroundColor: '#111b21',
+    // Keep compositing the page while the window is hidden (tray / start-minimized);
+    // without this Chromium can show a blank frame on the first show().
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: preloadWhatsappPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   });
 
