@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.10.1 — 2026-06-13
+
+### Bug Fixes
+
+- force repaint to avoid blank main window on show
+
+
 ## v1.10.0 — 2026-06-12
 
 ### Features
