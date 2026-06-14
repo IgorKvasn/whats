@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { sessionBus, Variant } from 'dbus-next';
 
 const SOUND_FILE = '/usr/share/sounds/freedesktop/stereo/message-new-instant.oga';
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
@@ -66,6 +65,14 @@ const activeNotificationIds = new Set<number>();
 const activeNotifications = new Map<number, ActiveNotification>();
 let cachedInterface: NotificationsInterface | null = null;
 
+type DbusModule = Pick<typeof import('dbus-next'), 'sessionBus' | 'Variant'>;
+let dbusModulePromise: Promise<DbusModule> | null = null;
+
+function loadDbus(): Promise<DbusModule> {
+  dbusModulePromise ??= import('dbus-next');
+  return dbusModulePromise;
+}
+
 function showNotificationFallback(
   sender: string,
   body: string,
@@ -95,12 +102,18 @@ export function showNotification(
   senderIconPath?: string | null,
   cleanupIcon?: () => void | Promise<void>,
 ): void {
-  const bus = sessionBus();
   const displayIconPath = senderIconPath || iconPath;
 
-  bus.getProxyObject(DBUS_DEST, DBUS_PATH)
-    .then((obj) => {
-      const iface = obj.getInterface(DBUS_DEST) as unknown as NotificationsInterface;
+  loadDbus()
+    .then(({ sessionBus, Variant }) => {
+      const bus = sessionBus();
+      return bus.getProxyObject(DBUS_DEST, DBUS_PATH).then((proxyObject) => ({
+        proxyObject,
+        Variant,
+      }));
+    })
+    .then(({ proxyObject, Variant }) => {
+      const iface = proxyObject.getInterface(DBUS_DEST) as unknown as NotificationsInterface;
       cachedInterface = iface;
       const actions = ['open', 'Open', 'dismiss', 'Dismiss'];
       const senderIconUri = senderIconPath ? pathToFileURL(senderIconPath).href : null;

@@ -34,6 +34,7 @@ import {
   installNavigationGuards,
   isTrustedWhatsappEvent,
 } from './navigation';
+import { shouldShowIncomingNotification } from './notificationPolicy';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings: Settings = loadSettings(settingsPath);
@@ -198,14 +199,12 @@ function registerIpcHandlers(iconDir: string): void {
     const senderTrunc = sender.slice(0, 200);
     const bodyTrunc = body ? body.slice(0, 1000) : '';
 
-    if (mainInForeground()) return;
+    if (!shouldShowIncomingNotification(settings, mainInForeground())) return;
 
     const now = Date.now();
     if (!shouldDispatch(lastNotification, now, senderTrunc, bodyTrunc, 1500)) return;
 
     lastNotification = { time: now, sender: senderTrunc, body: bodyTrunc };
-
-    if (!settings.notificationsEnabled) return;
 
     const bodyText = settings.includePreview ? bodyTrunc : '';
     const senderIconPath = await resolveNotificationIconPath(
