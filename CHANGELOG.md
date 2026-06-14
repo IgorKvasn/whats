@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.12.0 — 2026-06-14
+
+### Bug Fixes
+
+- resolve dependency security alerts
+
+
 ## v1.11.0 — 2026-06-14
 
 ### Performance
