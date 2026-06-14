@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.11.0 — 2026-06-14
+
+### Performance
+
+- lazy load notification dbus
+
+
 ## v1.10.1 — 2026-06-13
 
 ### Bug Fixes
