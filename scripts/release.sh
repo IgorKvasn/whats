@@ -277,13 +277,27 @@ fi
 # ------------------------------------------------------------------
 log "Building .deb (this can take a while)"
 
+# Remove stale .deb artifacts so dist/ only holds the version being released.
+DEB_DIR="${REPO_ROOT}/dist"
+shopt -s nullglob
+stale_debs=("${DEB_DIR}"/whats_*.deb)
+shopt -u nullglob
+if [[ "${#stale_debs[@]}" -gt 0 ]]; then
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    printf '   [dry-run] rm -f'
+    printf ' %q' "${stale_debs[@]}"
+    printf '\n'
+  else
+    rm -f "${stale_debs[@]}"
+  fi
+fi
+
 build_args=()
 [[ "${SKIP_TESTS}" -eq 1 ]] && build_args+=(--skip-tests)
 [[ "${SKIP_APT}"   -eq 1 ]] && build_args+=(--skip-apt)
 
 run bash "${SCRIPT_DIR}/build-deb.sh" "${build_args[@]}"
 
-DEB_DIR="${REPO_ROOT}/dist"
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   deb_file="${DEB_DIR}/whats_${new_version}_amd64.deb"
   printf '   [dry-run] expecting deb at %s\n' "${deb_file}"
