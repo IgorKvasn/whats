@@ -44,15 +44,42 @@ interface NotificationsInterface {
     summary: string,
     body: string,
     actions: string[],
-    hints: Record<string, unknown>,
+    hints: DbusHints,
     timeout: number,
-  ): Promise<number>;
-  CloseNotification(id: number): Promise<void>;
+    callback: (error: Error | null, id?: number) => void,
+  ): void;
+  CloseNotification(id: number, callback: (error: Error | null) => void): void;
   on(signal: 'ActionInvoked', handler: (id: number, actionKey: string) => void): void;
   on(signal: 'NotificationClosed', handler: (id: number, reason: number) => void): void;
   removeListener(signal: 'ActionInvoked', handler: (id: number, actionKey: string) => void): void;
   removeListener(signal: 'NotificationClosed', handler: (id: number, reason: number) => void): void;
 }
+
+interface DbusConnection {
+  once(event: 'error', handler: (error: Error) => void): void;
+  removeListener(event: 'error', handler: (error: Error) => void): void;
+}
+
+interface DbusService {
+  getInterface(
+    path: string,
+    interfaceName: string,
+    callback: (error: Error | null, iface?: NotificationsInterface) => void,
+  ): void;
+}
+
+interface DbusMessageBus {
+  connection: DbusConnection;
+  getService(name: string): DbusService;
+}
+
+type DbusNativeModule = {
+  default?: { sessionBus: () => DbusMessageBus };
+  sessionBus?: () => DbusMessageBus;
+};
+
+type DbusVariant = [signature: string, value: unknown];
+type DbusHints = Array<[key: string, value: DbusVariant]>;
 
 interface ActiveNotification {
   iface: NotificationsInterface;
@@ -65,12 +92,74 @@ const activeNotificationIds = new Set<number>();
 const activeNotifications = new Map<number, ActiveNotification>();
 let cachedInterface: NotificationsInterface | null = null;
 
-type DbusModule = Pick<typeof import('dbus-next'), 'sessionBus' | 'Variant'>;
-let dbusModulePromise: Promise<DbusModule> | null = null;
+let dbusModulePromise: Promise<DbusNativeModule> | null = null;
 
-function loadDbus(): Promise<DbusModule> {
-  dbusModulePromise ??= import('dbus-next');
+function loadDbus(): Promise<DbusNativeModule> {
+  dbusModulePromise ??= import('@homebridge/dbus-native') as Promise<DbusNativeModule>;
   return dbusModulePromise;
+}
+
+function getSessionBus(dbusModule: DbusNativeModule): DbusMessageBus {
+  const dbus = dbusModule.default ?? dbusModule;
+  if (!dbus.sessionBus) {
+    throw new Error('D-Bus sessionBus export is unavailable');
+  }
+  return dbus.sessionBus();
+}
+
+function getNotificationsInterface(dbusModule: DbusNativeModule): Promise<NotificationsInterface> {
+  return new Promise((resolve, reject) => {
+    const bus = getSessionBus(dbusModule);
+    let settled = false;
+    const onConnectionError = (error: Error): void => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+
+    bus.connection.once('error', onConnectionError);
+    bus.getService(DBUS_DEST).getInterface(DBUS_PATH, DBUS_DEST, (error, iface) => {
+      if (settled) return;
+      settled = true;
+      bus.connection.removeListener('error', onConnectionError);
+      if (error) {
+        reject(error);
+        return;
+      }
+      if (!iface) {
+        reject(new Error('D-Bus notifications interface is unavailable'));
+        return;
+      }
+      resolve(iface);
+    });
+  });
+}
+
+function notify(
+  iface: NotificationsInterface,
+  sender: string,
+  body: string,
+  iconPath: string,
+  senderIconPath: string | null | undefined,
+): Promise<number> {
+  const actions = ['open', 'Open', 'dismiss', 'Dismiss'];
+  const senderIconUri = senderIconPath ? pathToFileURL(senderIconPath).href : null;
+  const hints: DbusHints = senderIconUri
+    ? [
+        ['image-path', ['s', senderIconUri]],
+        ['image_path', ['s', senderIconUri]],
+      ]
+    : [];
+
+  return new Promise((resolve, reject) => {
+    iface.Notify('WhatsApp', 0, iconPath, sender, body, actions, hints, -1, (error, notificationId) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(notificationId ?? 0);
+    });
+  });
 }
 
 function showNotificationFallback(
@@ -105,26 +194,11 @@ export function showNotification(
   const displayIconPath = senderIconPath || iconPath;
 
   loadDbus()
-    .then(({ sessionBus, Variant }) => {
-      const bus = sessionBus();
-      return bus.getProxyObject(DBUS_DEST, DBUS_PATH).then((proxyObject) => ({
-        proxyObject,
-        Variant,
-      }));
-    })
-    .then(({ proxyObject, Variant }) => {
-      const iface = proxyObject.getInterface(DBUS_DEST) as unknown as NotificationsInterface;
+    .then((dbusModule) => getNotificationsInterface(dbusModule))
+    .then((iface) => {
       cachedInterface = iface;
-      const actions = ['open', 'Open', 'dismiss', 'Dismiss'];
-      const senderIconUri = senderIconPath ? pathToFileURL(senderIconPath).href : null;
-      const hints = senderIconPath
-        ? {
-            'image-path': new Variant('s', senderIconUri),
-            image_path: new Variant('s', senderIconUri),
-          }
-        : {};
 
-      return iface.Notify('WhatsApp', 0, iconPath, sender, body, actions, hints, -1)
+      return notify(iface, sender, body, iconPath, senderIconPath)
         .then((notificationId) => {
           activeNotificationIds.add(notificationId);
           const actionHandler = (id: number, actionKey: string): void => {
@@ -245,7 +319,7 @@ export function closeAllNotifications(): void {
   if (!cachedInterface || activeNotificationIds.size === 0) return;
   const iface = cachedInterface;
   for (const id of [...activeNotificationIds]) {
-    iface.CloseNotification(id).catch(() => {});
+    iface.CloseNotification(id, () => {});
     finalizeNotification(id);
   }
 }

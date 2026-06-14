@@ -25,32 +25,32 @@ vi.mock('node:child_process', async () => {
 type ActionInvokedHandler = (notificationId: number, actionKey: string) => void;
 type NotificationClosedHandler = (notificationId: number, reason: number) => void;
 
-const { mockNotifyCall, mockOnSignal, mockRemoveListener, mockCloseNotification, mockGetProxyObject } = vi.hoisted(() => {
-  const mockNotifyCall = vi.fn<(...args: unknown[]) => Promise<number>>();
+type DbusNativeCallback<T = unknown> = (error: Error | null, value?: T) => void;
+
+const { mockNotifyCall, mockOnSignal, mockRemoveListener, mockCloseNotification, mockGetInterface } = vi.hoisted(() => {
+  const mockNotifyCall = vi.fn<(...args: unknown[]) => void>();
   const mockOnSignal = vi.fn<(signal: string, handler: ActionInvokedHandler | NotificationClosedHandler) => void>();
   const mockRemoveListener = vi.fn();
-  const mockCloseNotification = vi.fn<(id: number) => Promise<void>>();
-  const mockGetProxyObject = vi.fn();
-  return { mockNotifyCall, mockOnSignal, mockRemoveListener, mockCloseNotification, mockGetProxyObject };
+  const mockCloseNotification = vi.fn<(id: number, callback: DbusNativeCallback<void>) => void>();
+  const mockGetInterface = vi.fn();
+  return { mockNotifyCall, mockOnSignal, mockRemoveListener, mockCloseNotification, mockGetInterface };
 });
 
-vi.mock('dbus-next', () => {
-  class MockVariant {
-    signature: string;
-    value: unknown;
-
-    constructor(signature: string, value: unknown) {
-      this.signature = signature;
-      this.value = value;
-    }
-  }
-
-  return {
-    Variant: MockVariant,
+vi.mock('@homebridge/dbus-native', () => {
+  const dbusNative = {
     sessionBus: () => ({
-      getProxyObject: mockGetProxyObject,
-      disconnect: vi.fn(),
+      connection: {
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      getService: () => ({
+        getInterface: mockGetInterface,
+      }),
     }),
+  };
+  return {
+    ...dbusNative,
+    default: dbusNative,
   };
 });
 
@@ -62,20 +62,23 @@ beforeEach(async () => {
   mockOnSignal.mockReset();
   mockRemoveListener.mockReset();
   mockCloseNotification.mockReset();
-  mockGetProxyObject.mockReset();
+  mockGetInterface.mockReset();
 
   const { resetNotificationState } = await notificationsModule;
   resetNotificationState();
 
-  mockCloseNotification.mockResolvedValue(undefined);
-  mockNotifyCall.mockResolvedValue(42);
-  mockGetProxyObject.mockResolvedValue({
-    getInterface: () => ({
+  mockCloseNotification.mockImplementation((_id, callback) => callback(null));
+  mockNotifyCall.mockImplementation((...args) => {
+    const callback = args.at(-1) as DbusNativeCallback<number>;
+    callback(null, 42);
+  });
+  mockGetInterface.mockImplementation((_path, _iface, callback: DbusNativeCallback) => {
+    callback(null, {
       Notify: mockNotifyCall,
       CloseNotification: mockCloseNotification,
       on: mockOnSignal,
       removeListener: mockRemoveListener,
-    }),
+    });
   });
 });
 
@@ -147,6 +150,7 @@ describe('showNotification', () => {
     expect(args[4]).toBe('Hello');           // body
     expect(args[5]).toEqual(['open', 'Open', 'dismiss', 'Dismiss']); // actions
     expect(args[7]).toBe(-1);               // timeout
+    expect(args[8]).toEqual(expect.any(Function));
   });
 
   it('uses bundled icon as app icon and sender icon file URI as D-Bus image hint', async () => {
@@ -159,16 +163,10 @@ describe('showNotification', () => {
 
     const args = mockNotifyCall.mock.calls[0];
     expect(args[2]).toBe('/icons/icon.png');
-    expect(args[6]).toEqual({
-      'image-path': expect.objectContaining({
-        signature: 's',
-        value: 'file:///tmp/alice.png',
-      }),
-      image_path: expect.objectContaining({
-        signature: 's',
-        value: 'file:///tmp/alice.png',
-      }),
-    });
+    expect(args[6]).toEqual([
+      ['image-path', ['s', 'file:///tmp/alice.png']],
+      ['image_path', ['s', 'file:///tmp/alice.png']],
+    ]);
   });
 
   it('calls onOpen when ActionInvoked fires with "open"', async () => {
@@ -258,7 +256,9 @@ describe('showNotification', () => {
   });
 
   it('falls back to notify-send without actions when D-Bus fails', async () => {
-    mockGetProxyObject.mockRejectedValue(new Error('D-Bus unavailable'));
+    mockGetInterface.mockImplementation((_path, _iface, callback: DbusNativeCallback) => {
+      callback(new Error('D-Bus unavailable'));
+    });
     const { showNotification } = await notificationsModule;
     mockExecFile.mockImplementation((_cmd, _args, cb) => cb(null, '', ''));
 
@@ -366,13 +366,19 @@ describe('closeAllNotifications', () => {
   it('calls CloseNotification for all active notifications', async () => {
     const { showNotification, closeAllNotifications } = await notificationsModule;
 
-    mockNotifyCall.mockResolvedValueOnce(10);
+    mockNotifyCall.mockImplementationOnce((...args) => {
+      const callback = args.at(-1) as DbusNativeCallback<number>;
+      callback(null, 10);
+    });
     showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn());
     await vi.waitFor(() => {
       expect(mockNotifyCall).toHaveBeenCalledTimes(1);
     });
 
-    mockNotifyCall.mockResolvedValueOnce(11);
+    mockNotifyCall.mockImplementationOnce((...args) => {
+      const callback = args.at(-1) as DbusNativeCallback<number>;
+      callback(null, 11);
+    });
     showNotification('Bob', 'Hey', false, '/icons/icon.png', vi.fn());
     await vi.waitFor(() => {
       expect(mockNotifyCall).toHaveBeenCalledTimes(2);
@@ -380,8 +386,8 @@ describe('closeAllNotifications', () => {
 
     closeAllNotifications();
 
-    expect(mockCloseNotification).toHaveBeenCalledWith(10);
-    expect(mockCloseNotification).toHaveBeenCalledWith(11);
+    expect(mockCloseNotification).toHaveBeenCalledWith(10, expect.any(Function));
+    expect(mockCloseNotification).toHaveBeenCalledWith(11, expect.any(Function));
     expect(mockCloseNotification).toHaveBeenCalledTimes(2);
   });
 
@@ -414,13 +420,19 @@ describe('closeAllNotifications', () => {
     const removeFirstIcon = vi.fn();
     const removeSecondIcon = vi.fn();
 
-    mockNotifyCall.mockResolvedValueOnce(10);
+    mockNotifyCall.mockImplementationOnce((...args) => {
+      const callback = args.at(-1) as DbusNativeCallback<number>;
+      callback(null, 10);
+    });
     showNotification('Alice', 'Hello', false, '/icons/icon.png', vi.fn(), '/tmp/alice.png', removeFirstIcon);
     await vi.waitFor(() => {
       expect(mockNotifyCall).toHaveBeenCalledTimes(1);
     });
 
-    mockNotifyCall.mockResolvedValueOnce(11);
+    mockNotifyCall.mockImplementationOnce((...args) => {
+      const callback = args.at(-1) as DbusNativeCallback<number>;
+      callback(null, 11);
+    });
     showNotification('Bob', 'Hey', false, '/icons/icon.png', vi.fn(), '/tmp/bob.png', removeSecondIcon);
     await vi.waitFor(() => {
       expect(mockNotifyCall).toHaveBeenCalledTimes(2);

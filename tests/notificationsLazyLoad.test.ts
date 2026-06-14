@@ -6,32 +6,33 @@ describe('notification startup loading', () => {
   it('loads D-Bus only when showing a notification', async () => {
     vi.resetModules();
     let dbusImportCount = 0;
-    const mockNotify = vi.fn().mockResolvedValue(42);
+    const mockNotify = vi.fn((...args) => {
+      const callback = args.at(-1);
+      callback(null, 42);
+    });
 
-    vi.doMock('dbus-next', () => {
+    vi.doMock('@homebridge/dbus-native', () => {
       dbusImportCount += 1;
 
-      return {
-        Variant: class MockVariant {
-          signature: string;
-          value: unknown;
-
-          constructor(signature: string, value: unknown) {
-            this.signature = signature;
-            this.value = value;
-          }
-        },
+      const dbusNative = {
         sessionBus: () => ({
-          getProxyObject: vi.fn().mockResolvedValue({
-            getInterface: () => ({
+          connection: {
+            once: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          getService: () => ({
+            getInterface: vi.fn((_path, _iface, callback) => callback(null, {
               Notify: mockNotify,
-              CloseNotification: vi.fn().mockResolvedValue(undefined),
+              CloseNotification: vi.fn((_id, callback) => callback(null)),
               on: vi.fn(),
               removeListener: vi.fn(),
-            }),
+            })),
           }),
-          disconnect: vi.fn(),
         }),
+      };
+      return {
+        ...dbusNative,
+        default: dbusNative,
       };
     });
 
@@ -51,10 +52,11 @@ describe('notification startup loading', () => {
       'Alice',
       'Hello',
       ['open', 'Open', 'dismiss', 'Dismiss'],
-      {},
+      [],
       -1,
+      expect.any(Function),
     );
 
-    vi.doUnmock('dbus-next');
+    vi.doUnmock('@homebridge/dbus-native');
   });
 });
