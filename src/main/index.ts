@@ -34,6 +34,8 @@ import {
   installNavigationGuards,
   isTrustedWhatsappEvent,
 } from './navigation';
+import { installAutoReload, MAIN_URL, type AutoReloadController } from './reload';
+import { ReconnectOverlay } from './reconnectOverlay';
 import { shouldShowIncomingNotification } from './notificationPolicy';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
@@ -43,6 +45,7 @@ let currentUpdate: UpdateInfo | null = null;
 let trayHandle: TrayHandle | null = null;
 let dialogs: ReturnType<typeof createDialogOpeners>;
 let notificationIconPath = '';
+let autoReload: AutoReloadController | null = null;
 
 if (!settings.hardwareAccelerationEnabled) {
   app.disableHardwareAcceleration();
@@ -101,11 +104,20 @@ async function initialize(): Promise<void> {
   installNavigationGuards(mainWindow.webContents, (url) => {
     void shell.openExternal(url);
   });
-  mainWindow.loadURL('https://web.whatsapp.com/');
 
   const rendererUrl =
     process.env.ELECTRON_RENDERER_URL ??
     `file://${path.join(__dirname, '../renderer/index.html')}`;
+
+  const reconnectOverlay = new ReconnectOverlay({
+    parent: mainWindow,
+    preloadPath: preloadDialogPath,
+    rendererUrl,
+  });
+  autoReload = installAutoReload(mainWindow.webContents, {
+    onStatusChange: (status) => reconnectOverlay.handleStatus(status),
+  });
+  mainWindow.loadURL(MAIN_URL);
 
   dialogs = createDialogOpeners(preloadDialogPath, rendererUrl);
 
@@ -187,6 +199,10 @@ function registerIpcHandlers(iconDir: string): void {
   ipcMain.on('window:close', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.close();
+  });
+
+  ipcMain.on('reconnect:now', () => {
+    autoReload?.reconnectNow();
   });
 
   ipcMain.on('whatsapp:notify', async (

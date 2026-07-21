@@ -11,4 +11,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSkippedVersion: (version: string) => ipcRenderer.invoke('update:skip-version', version),
   openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
   closeWindow: () => ipcRenderer.send('window:close'),
+  reconnectNow: () => ipcRenderer.send('reconnect:now'),
+  onReconnectStatus: (listener: (status: string) => void) => {
+    const handler = (_event: unknown, status: string) => listener(status);
+    ipcRenderer.on('reconnect:status', handler);
+    return () => ipcRenderer.removeListener('reconnect:status', handler);
+  },
 });

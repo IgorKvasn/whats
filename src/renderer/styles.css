@@ -155,3 +155,66 @@ button:disabled {
   opacity: 1;
   transform: translateY(0);
 }
+
+.reconnect {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111b21;
+  color: #e9edef;
+}
+
+.reconnect-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 32px;
+  max-width: 360px;
+}
+
+.reconnect-card h1 {
+  margin: 0;
+  color: #e9edef;
+}
+
+.reconnect-card p {
+  margin: 0;
+  color: #8696a0;
+}
+
+.reconnect-card button {
+  margin-top: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  background: #00a884;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.reconnect-card button:hover:not(:disabled) {
+  background: #06cf9c;
+}
+
+.reconnect-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(233, 237, 239, 0.2);
+  border-top-color: #00a884;
+}
+
+.reconnect-spinner.active {
+  animation: reconnect-spin 0.8s linear infinite;
+}
+
+@keyframes reconnect-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

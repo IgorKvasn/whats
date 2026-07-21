@@ -36,7 +36,11 @@ interface ElectronAPI {
   setSkippedVersion(version: string): Promise<void>;
   openExternal(url: string): Promise<void>;
   closeWindow(): void;
+  reconnectNow(): void;
+  onReconnectStatus(listener: (status: ReconnectStatus) => void): () => void;
 }
+
+export type ReconnectStatus = 'waiting' | 'reconnecting' | 'connected';
 
 declare global {
   interface Window {
