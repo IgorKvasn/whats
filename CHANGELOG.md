@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.13.0 — 2026-07-21
+
+### Bug Fixes
+
+- auto-reconnect and reconnect overlay when initial page load fails
+- remove stale .deb artifacts before building
+
+### Build
+
+- bump tmp from 0.2.5 to 0.2.7
+
+### CI
+
+- group updates, add cooldown and commit prefixes
+
+
 ## v1.12.0 — 2026-06-14
 
 ### Bug Fixes
