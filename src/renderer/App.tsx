@@ -15,6 +15,7 @@ import {
   type ManualCheckResult,
   type UpdateInfo,
 } from './updateApi';
+import type { ReconnectStatus } from './electron';
 import './styles.css';
 
 const viewParam = new URLSearchParams(window.location.search).get('view');
@@ -22,7 +23,37 @@ const viewParam = new URLSearchParams(window.location.search).get('view');
 export default function App() {
   if (viewParam === 'about') return <AboutView />;
   if (viewParam === 'update') return <UpdateView />;
+  if (viewParam === 'reconnect') return <ReconnectView />;
   return <SettingsView />;
+}
+
+function ReconnectView() {
+  const [status, setStatus] = useState<ReconnectStatus>('waiting');
+
+  useEffect(() => window.electronAPI.onReconnectStatus(setStatus), []);
+
+  const reconnecting = status === 'reconnecting';
+
+  return (
+    <div className="reconnect">
+      <div className="reconnect-card">
+        <div className={`reconnect-spinner ${reconnecting ? 'active' : ''}`} aria-hidden="true" />
+        <h1>{reconnecting ? 'Reconnecting…' : 'Waiting to reconnect'}</h1>
+        <p>
+          {reconnecting
+            ? 'Trying to reach WhatsApp Web.'
+            : "Couldn't reach WhatsApp Web. It will retry automatically."}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.electronAPI.reconnectNow()}
+          disabled={reconnecting}
+        >
+          {reconnecting ? 'Reconnecting…' : 'Reconnect now'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function SettingsView() {
