@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.15.0 — 2026-07-21
+
+### Bug Fixes
+
+- bump transitive js-yaml to 4.3.0 to resolve CVE-2026-59869 (#25)
+
+
 ## v1.14.0 — 2026-07-21
 
 ### Bug Fixes
