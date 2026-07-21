@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.14.0 — 2026-07-21
+
+### Bug Fixes
+
+- cast dbus-native import through unknown to fix type-check (#24)
+
+### Build
+
+- bump the production-minor-patch group across 1 directory with 4 updates (#20)
+
+### CI
+
+- bump the github-actions group across 1 directory with 3 updates (#21)
+
+### Chores
+
+- bump the dev-dependencies group across 1 directory with 5 updates (#19)
+- bump form-data from 4.0.5 to 4.0.6 (#14)
+- bump undici from 6.26.0 to 6.27.0 (#15)
+- bump tar from 7.5.16 to 7.5.20 (#23)
+
+
 ## v1.13.0 — 2026-07-21
 
 ### Bug Fixes
