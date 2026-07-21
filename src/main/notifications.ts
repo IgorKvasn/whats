@@ -95,7 +95,9 @@ let cachedInterface: NotificationsInterface | null = null;
 let dbusModulePromise: Promise<DbusNativeModule> | null = null;
 
 function loadDbus(): Promise<DbusNativeModule> {
-  dbusModulePromise ??= import('@homebridge/dbus-native') as Promise<DbusNativeModule>;
+  // The package's shipped types only declare systemBus(), but the runtime also
+  // exports sessionBus(), which we rely on. Cast through unknown to reconcile.
+  dbusModulePromise ??= import('@homebridge/dbus-native') as unknown as Promise<DbusNativeModule>;
   return dbusModulePromise;
 }
 
