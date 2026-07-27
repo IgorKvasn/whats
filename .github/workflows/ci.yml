@@ -39,5 +39,8 @@ jobs:
       - name: Type-check main and preload
         run: npx tsc -p tsconfig.node.json --noEmit
 
+      - name: Type-check renderer
+        run: npx tsc -p tsconfig.json --noEmit
+
       - name: Build
         run: npm run build

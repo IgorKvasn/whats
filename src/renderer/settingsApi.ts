@@ -1,12 +1,6 @@
-export interface Settings {
-  notificationsEnabled: boolean;
-  soundEnabled: boolean;
-  includePreview: boolean;
-  autoUpdateCheckEnabled: boolean;
-  hardwareAccelerationEnabled: boolean;
-  startMinimizedToTray: boolean;
-  updateState: unknown;
-}
+import type { Settings } from './electron';
+
+export type { Settings };
 
 export async function getSettings(): Promise<Settings> {
   return window.electronAPI.getSettings();
