@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.16.1 — 2026-07-27
+
+### Bug Fixes
+
+- sync Settings type and enable renderer type-checking (#31)
+
+
 ## v1.16.0 — 2026-07-27
 
 ### Bug Fixes
