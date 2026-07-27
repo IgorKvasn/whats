@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.16.0 — 2026-07-27
+
+### Bug Fixes
+
+- bump transitive fast-uri to 3.1.4 to resolve host confusion advisories
+
+### CI
+
+- bump the github-actions group with 2 updates (#29)
+
+### Chores
+
+- bump electron from 42.3.0 to 43.2.0 (#27)
+- bump typescript from 6.0.3 to 7.0.2 (#28)
+
+
 ## v1.15.0 — 2026-07-21
 
 ### Bug Fixes
