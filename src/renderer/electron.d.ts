@@ -8,6 +8,8 @@ export interface Settings {
   soundEnabled: boolean;
   includePreview: boolean;
   autoUpdateCheckEnabled: boolean;
+  hardwareAccelerationEnabled: boolean;
+  startMinimizedToTray: boolean;
   updateState: unknown;
 }
 
