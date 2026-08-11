@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.16.2 — 2026-08-11
+
+### Bug Fixes
+
+- bump js-yaml, postcss, and brace-expansion to patch transitive CVEs (#41)
+
+### Build
+
+- bump the production-minor-patch group with 3 updates (#32)
+
+### CI
+
+- bump github/codeql-action in the github-actions group (#34)
+
+### Chores
+
+- bump @types/semver in the dev-dependencies group (#37)
+- bump fast-uri from 3.1.4 to 3.1.5 (#36)
+- bump undici from 6.27.0 to 6.28.0 (#35)
+
+
 ## v1.16.1 — 2026-07-27
 
 ### Bug Fixes
