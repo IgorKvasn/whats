@@ -109,6 +109,22 @@ What this costs: human observation can miss a single-frame flash that a capture
 would catch, and cannot be replayed. Counts here are a floor, not an exact
 figure.
 
+## What this experiment does not cover
+
+The ticket asked for "~30 hide/show cycles each". These are 30 **first shows**
+per configuration, one per launch, for the reason above: cycling one window
+cannot test `paintWhenInitiallyHidden` at all. That is the right call for the
+option under test, but it narrows coverage in a way worth stating plainly.
+
+The repeat-show path — hide an already-shown window, show it again — is
+**untested by every configuration here**. If the original blank frames were seen
+on ordinary shows rather than the first show after launch, this experiment did
+not exercise the failing path, which is a second and independent reason its null
+result cannot clear the cheap configuration. `backgroundThrottling` in particular
+applies to a hidden window whether or not it has been shown before, so it is
+testable by cycling; only `paintWhenInitiallyHidden` requires a fresh launch. A
+follow-up could separate the two on that basis.
+
 ## Running it
 
 Needs a packaged build at `/opt/whats/whats` containing this code, per the
@@ -150,7 +166,8 @@ Frames judged by eye by the maintainer, live against per-trial markers.
 | `control` (shipped) | 30 | **0** | 1146 / 639 MiB | 1034 / 525 MiB |
 
 Raw data in `blank-frame-20260814/<config>/` — `trials.jsonl`, `summary.json`,
-`memory.json`.
+`memory.json`. The per-trial `app-*.log` launch logs are written there too but
+are not committed: a repo-wide `*.log` ignore rule excludes them.
 
 ### The bug did not reproduce
 
@@ -184,10 +201,32 @@ of the T+10s spread, which is itself a sign of how much of the gap is startup
 transient rather than steady state. Treat the direction as credible and the
 magnitude as indicative only.
 
-Notably the GPU process is ~102-104 MiB RSS in **all three**, including
-`cheap-only` with `paintWhenInitiallyHidden: false`. The expected saving was a
-GPU process that does not build a compositor for an unshown window; that saving
-did not appear.
+Where the gap actually sits, by process type at T+10s (RSS MiB):
+
+| process type | `cheap-only` | `no-paint-when-hidden` | `control` | delta |
+|---|---|---|---|---|
+| renderer | 429 | 468 | 566 | **+137** |
+| browser | 225 | 242 | 242 | +17 |
+| gpu-process | 102 | 104 | 104 | +2 |
+| network service | 86 | 90 | 90 | +4 |
+| zygote (both) | 121 | 127 | 128 | +7 |
+| broker | 16 | 16 | 16 | 0 |
+
+**The GPU process is flat — ~102-104 MiB in all three**, including `cheap-only`
+with `paintWhenInitiallyHidden: false`. The ticket's stated cost rationale was a
+GPU process holding real memory to composite a never-shown window; that cost
+does not appear in the data, consistent with remedy 3 being a no-op.
+
+The 168 MiB gap is **renderer memory, 137 MiB of it**, and it tracks
+`backgroundThrottling` rather than `paintWhenInitiallyHidden`: the only step that
+moves the renderer materially is `no-paint-when-hidden` → `control` (+98 MiB),
+which is exactly where throttling is disabled. An unthrottled hidden renderer
+keeping timers and compositing work alive is a plausible mechanism, and it means
+the memory argument for changing anything rests on remedy 4, not remedy 3.
+
+Single readings, so treat these as one observation apiece rather than
+established magnitudes — but the attribution to the renderer is large enough to
+survive the noise.
 
 ## Recommendation
 
@@ -216,6 +255,10 @@ To actually settle it, the missing piece is the control's blank rate:
 - Worth testing first: whether the forced repaint alone (remedy 1, cheap) is
   what fixed it. That is the hypothesis this experiment was not built to test,
   since all three configurations here keep it.
+- Cover the repeat-show path too (see "What this experiment does not cover"). A
+  hide/show cycle cannot test `paintWhenInitiallyHidden`, but it can test
+  `backgroundThrottling` — which is where the memory cost actually is — so the
+  two remedies are separable by method as well as by cost.
 
 Also note remedy 3 is inert regardless: `paintWhenInitiallyHidden: true` sets
 Electron's own default, so the shipped line can be deleted as dead
