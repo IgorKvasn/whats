@@ -12,6 +12,7 @@
     "postinstall": "electron-builder install-app-deps",
     "package": "electron-vite build && electron-builder --linux deb",
     "test": "vitest run",
+    "measure-memory": "node --experimental-strip-types --no-warnings scripts/measure-memory.mjs",
     "prepare": "husky"
   },
   "dependencies": {

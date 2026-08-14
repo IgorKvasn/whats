@@ -1,0 +1,246 @@
+{
+  "executable": "/opt/whats/whats",
+  "capturedAt": "2026-08-14T10:47:17.542Z",
+  "readings": [
+    {
+      "target": 10,
+      "elapsedSeconds": 10.090000000000146,
+      "missedBy": null,
+      "summary": {
+        "totalResidentKib": 1190308,
+        "totalProportionalKib": 668085,
+        "totalSwapKib": 0,
+        "processCount": 9,
+        "processes": [
+          {
+            "pid": 286100,
+            "processType": "renderer",
+            "residentKib": 473044,
+            "proportionalKib": 404732,
+            "swapKib": 0
+          },
+          {
+            "pid": 285765,
+            "processType": "browser",
+            "residentKib": 249064,
+            "proportionalKib": 111455,
+            "swapKib": 0
+          },
+          {
+            "pid": 286073,
+            "processType": "renderer",
+            "residentKib": 122408,
+            "proportionalKib": 64278,
+            "swapKib": 0
+          },
+          {
+            "pid": 285807,
+            "processType": "gpu-process",
+            "residentKib": 107376,
+            "proportionalKib": 25426,
+            "swapKib": 0
+          },
+          {
+            "pid": 285810,
+            "processType": "utility:network.mojom.NetworkService",
+            "residentKib": 93164,
+            "proportionalKib": 32655,
+            "swapKib": 0
+          },
+          {
+            "pid": 285774,
+            "processType": "zygote",
+            "residentKib": 57368,
+            "proportionalKib": 9878,
+            "swapKib": 0
+          },
+          {
+            "pid": 285773,
+            "processType": "zygote:no-sandbox",
+            "residentKib": 57324,
+            "proportionalKib": 11046,
+            "swapKib": 0
+          },
+          {
+            "pid": 285811,
+            "processType": "broker",
+            "residentKib": 16248,
+            "proportionalKib": 5246,
+            "swapKib": 0
+          },
+          {
+            "pid": 285776,
+            "processType": "zygote",
+            "residentKib": 14312,
+            "proportionalKib": 3369,
+            "swapKib": 0
+          }
+        ],
+        "byType": [
+          {
+            "processType": "renderer",
+            "count": 2,
+            "residentKib": 595452,
+            "proportionalKib": 469010
+          },
+          {
+            "processType": "browser",
+            "count": 1,
+            "residentKib": 249064,
+            "proportionalKib": 111455
+          },
+          {
+            "processType": "gpu-process",
+            "count": 1,
+            "residentKib": 107376,
+            "proportionalKib": 25426
+          },
+          {
+            "processType": "utility:network.mojom.NetworkService",
+            "count": 1,
+            "residentKib": 93164,
+            "proportionalKib": 32655
+          },
+          {
+            "processType": "zygote",
+            "count": 2,
+            "residentKib": 71680,
+            "proportionalKib": 13247
+          },
+          {
+            "processType": "zygote:no-sandbox",
+            "count": 1,
+            "residentKib": 57324,
+            "proportionalKib": 11046
+          },
+          {
+            "processType": "broker",
+            "count": 1,
+            "residentKib": 16248,
+            "proportionalKib": 5246
+          }
+        ]
+      }
+    },
+    {
+      "target": 60,
+      "elapsedSeconds": 60.11000000000058,
+      "missedBy": null,
+      "summary": {
+        "totalResidentKib": 1085336,
+        "totalProportionalKib": 558730,
+        "totalSwapKib": 0,
+        "processCount": 9,
+        "processes": [
+          {
+            "pid": 286100,
+            "processType": "renderer",
+            "residentKib": 359776,
+            "proportionalKib": 290532,
+            "swapKib": 0
+          },
+          {
+            "pid": 285765,
+            "processType": "browser",
+            "residentKib": 247564,
+            "proportionalKib": 109388,
+            "swapKib": 0
+          },
+          {
+            "pid": 286073,
+            "processType": "renderer",
+            "residentKib": 131880,
+            "proportionalKib": 71424,
+            "swapKib": 0
+          },
+          {
+            "pid": 285807,
+            "processType": "gpu-process",
+            "residentKib": 107508,
+            "proportionalKib": 25416,
+            "swapKib": 0
+          },
+          {
+            "pid": 285810,
+            "processType": "utility:network.mojom.NetworkService",
+            "residentKib": 93356,
+            "proportionalKib": 32453,
+            "swapKib": 0
+          },
+          {
+            "pid": 285774,
+            "processType": "zygote",
+            "residentKib": 57368,
+            "proportionalKib": 9869,
+            "swapKib": 0
+          },
+          {
+            "pid": 285773,
+            "processType": "zygote:no-sandbox",
+            "residentKib": 57324,
+            "proportionalKib": 11038,
+            "swapKib": 0
+          },
+          {
+            "pid": 285811,
+            "processType": "broker",
+            "residentKib": 16248,
+            "proportionalKib": 5241,
+            "swapKib": 0
+          },
+          {
+            "pid": 285776,
+            "processType": "zygote",
+            "residentKib": 14312,
+            "proportionalKib": 3369,
+            "swapKib": 0
+          }
+        ],
+        "byType": [
+          {
+            "processType": "renderer",
+            "count": 2,
+            "residentKib": 491656,
+            "proportionalKib": 361956
+          },
+          {
+            "processType": "browser",
+            "count": 1,
+            "residentKib": 247564,
+            "proportionalKib": 109388
+          },
+          {
+            "processType": "gpu-process",
+            "count": 1,
+            "residentKib": 107508,
+            "proportionalKib": 25416
+          },
+          {
+            "processType": "utility:network.mojom.NetworkService",
+            "count": 1,
+            "residentKib": 93356,
+            "proportionalKib": 32453
+          },
+          {
+            "processType": "zygote",
+            "count": 2,
+            "residentKib": 71680,
+            "proportionalKib": 13238
+          },
+          {
+            "processType": "zygote:no-sandbox",
+            "count": 1,
+            "residentKib": 57324,
+            "proportionalKib": 11038
+          },
+          {
+            "processType": "broker",
+            "count": 1,
+            "residentKib": 16248,
+            "proportionalKib": 5241
+          }
+        ]
+      }
+    }
+  ]
+}
