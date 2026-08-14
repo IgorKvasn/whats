@@ -37,8 +37,6 @@ import {
 import { installAutoReload, MAIN_URL, type AutoReloadController } from './reload';
 import { ReconnectOverlay } from './reconnectOverlay';
 import { shouldShowIncomingNotification } from './notificationPolicy';
-import { readConfiguration, parseTrialIndex } from './blankFrameExperiment';
-import { runTrial } from './blankFrameRunner';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings: Settings = loadSettings(settingsPath);
@@ -77,16 +75,6 @@ async function initialize(): Promise<void> {
   const preloadDialogPath = path.join(__dirname, '../preload/index.cjs');
   const preloadWhatsappPath = path.join(__dirname, '../preload/whatsapp.cjs');
 
-  // Resolves to the shipped behaviour unless WHATS_EXPERIMENT_CONFIG overrides
-  // it; see docs/memory/blank-frame-experiment.md (issue #43).
-  const { configuration: experimentOptions, recognised } = readConfiguration(process.env);
-  if (!recognised) {
-    console.error(
-      `[experiment] unknown WHATS_EXPERIMENT_CONFIG=${process.env.WHATS_EXPERIMENT_CONFIG}; ` +
-        `using the shipped configuration`,
-    );
-  }
-
   const mainWindow = new BrowserWindow({
     title: 'WhatsApp',
     width: 1200,
@@ -96,15 +84,15 @@ async function initialize(): Promise<void> {
     show: false,
     backgroundColor: '#111b21',
     // paintWhenInitiallyHidden is deliberately not set: it defaults to true, so
-    // passing true was a no-op. The experiment still needs to turn it off, and
-    // only ever passes false; see docs/memory/blank-frame-experiment.md (#43).
-    ...(experimentOptions.paintWhenInitiallyHidden ? {} : { paintWhenInitiallyHidden: false }),
+    // passing it explicitly was a no-op (see docs/memory/blank-frame-experiment.md).
     webPreferences: {
       preload: preloadWhatsappPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      backgroundThrottling: experimentOptions.backgroundThrottling,
+      // Keep the renderer unthrottled while hidden in the tray; part of the
+      // c3057c4 blank-window fix, still unproven but not weakened here.
+      backgroundThrottling: false,
     },
   });
 
@@ -166,50 +154,6 @@ async function initialize(): Promise<void> {
     setTimeout(() => runStartupCheck(), 5000);
   }
 
-  startBlankFrameExperiment(mainWindow);
-}
-
-// Issue #43. Returns before touching the window on a normal launch, so the
-// shipped behaviour is unaffected by the experiment being compiled in.
-// The window must never have been shown before the trial, which is what makes
-// paintWhenInitiallyHidden observable, so this requires startMinimizedToTray
-// and quits afterwards to leave the next launch a clean first show.
-function startBlankFrameExperiment(mainWindow: BrowserWindow): void {
-  const trialIndex = parseTrialIndex(process.env.WHATS_BLANK_TRIAL);
-  if (trialIndex === 0) {
-    return;
-  }
-
-  const logPath = process.env.WHATS_BLANK_LOG;
-  if (!logPath) {
-    console.error('[experiment] WHATS_BLANK_TRIAL is set but WHATS_BLANK_LOG is not; not running');
-    return;
-  }
-
-  if (!settings.startMinimizedToTray) {
-    console.error(
-      '[experiment] startMinimizedToTray must be enabled: the window has to be unshown ' +
-        'until the trial for paintWhenInitiallyHidden to have any effect',
-    );
-    app.exit(2);
-    return;
-  }
-
-  const { configuration } = readConfiguration(process.env);
-  mainWindow.webContents.once('did-finish-load', () => {
-    // Let the page settle before the show, so the trial measures presenting a
-    // loaded page rather than racing first paint.
-    setTimeout(() => {
-      void runTrial(mainWindow, showMainWindow, {
-        trialIndex,
-        configurationId: configuration.id,
-        logPath,
-      }).then(() => {
-        console.log('[experiment] trial complete');
-        app.exit(0);
-      });
-    }, 5000);
-  });
 }
 
 function registerIpcHandlers(iconDir: string): void {

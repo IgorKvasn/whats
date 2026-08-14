@@ -52,15 +52,24 @@ colour — so only the expensive options vary.
 `backgroundThrottling: true` is Chromium's default, so `cheap-only` is "neither
 expensive option applied".
 
-Selection is by environment variable, so one packaged build exercises all three
-and the shipped defaults are untouched when the variables are absent:
+Selection was by environment variable, so one packaged build could exercise all
+three:
 
 ```bash
 WHATS_EXPERIMENT_CONFIG=cheap-only /opt/whats/whats
 ```
 
-An unrecognised value logs a warning and falls back to the shipped
-configuration rather than silently measuring the wrong thing.
+**The production hook has since been removed.** Once this ticket closed, leaving
+env-var-driven window options and a trial that calls `app.exit()` in the shipped
+binary bought nothing, so `src/main/index.ts` no longer reads any of it and the
+built bundle contains no experiment code. `backgroundThrottling: false` is now a
+plain literal there, alongside the forced repaint and background colour.
+
+The harness itself is kept, under `scripts/blank-frame-experiment/` plus
+`scripts/run-blank-frame-experiment.sh`, `scripts/record-blank-frames.mjs` and
+`tests/blankFrameExperiment.test.ts`. Re-running it means re-wiring the two
+window options and the trial hook into `src/main/index.ts` — deliberately a
+visible step, since it puts measurement scaffolding back on the release path.
 
 ## One trial per app launch
 

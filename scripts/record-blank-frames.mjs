@@ -12,7 +12,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline/promises';
-import { parseReportedTrials, summarizeReportedTrials } from '../src/main/blankFrameExperiment.ts';
+import { parseReportedTrials, summarizeReportedTrials } from './blank-frame-experiment/blankFrameExperiment.ts';
 
 function parseArguments(argv) {
   const options = { log: null, out: null, blank: null };

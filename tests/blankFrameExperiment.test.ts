@@ -6,7 +6,7 @@ import {
   parseReportedTrials,
   summarizeReportedTrials,
   type Trial,
-} from '../src/main/blankFrameExperiment';
+} from '../scripts/blank-frame-experiment/blankFrameExperiment';
 
 describe('CONFIGURATIONS', () => {
   it('describes the three configurations the experiment compares', () => {
@@ -66,11 +66,10 @@ describe('readConfiguration', () => {
   });
 });
 
-// Mirrors how src/main/index.ts assembles the BrowserWindow options, so these
-// guard the promise that a normal launch is untouched by the experiment.
-// paintWhenInitiallyHidden is omitted rather than set to true: true is
-// Chromium's default, so passing it was a no-op, and the experiment only ever
-// needs to pass false.
+// The window options each configuration would apply. The app itself no longer
+// reads these: the production hook was removed once #43 closed, so a future run
+// has to re-wire them into src/main/index.ts deliberately. Kept so the
+// configuration table stays honest about what it claims to compare.
 describe('window options from the selected configuration', () => {
   const windowOptions = (environment: Record<string, string | undefined>) => {
     const { configuration } = readConfiguration(environment);
