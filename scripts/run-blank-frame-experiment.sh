@@ -48,6 +48,15 @@ if ! rg -q '"startMinimizedToTray": true' "${SETTINGS}" 2>/dev/null; then
   exit 1
 fi
 
+# An instance already running holds the single-instance lock, so trial 1 would
+# exit immediately without ever showing a window. Refuse rather than silently
+# lose a trial.
+if ps -eo args | rg -q "^${EXECUTABLE} --ozone-platform" 2>/dev/null; then
+  echo "An instance of ${EXECUTABLE} is already running; quit it first." >&2
+  echo "It holds the single-instance lock, which would void trial 1." >&2
+  exit 1
+fi
+
 log "Configuration: ${CONFIG}, ${TRIALS} trials"
 echo "Watch the window on each trial. A '>>> trial N' line prints at the moment"
 echo "the window appears; note any number that shows a blank or white frame."
@@ -136,8 +145,13 @@ else
   echo "    memory capture failed; see ${OUT_DIR}/memory.err" >&2
 fi
 
-kill "${MEMORY_APP_PID}" 2>/dev/null || true
+# SIGKILL, not SIGTERM: the app treats a term as a close and minimises to tray
+# instead of quitting, so it would outlive this script, and the surviving
+# instance holds the single-instance lock -- voiding trial 1 of whichever
+# configuration runs next.
+kill -9 "${MEMORY_APP_PID}" 2>/dev/null || true
 wait "${MEMORY_APP_PID}" 2>/dev/null || true
+sleep 3
 
 # A trial that never showed a window is not a blank frame, and must not be
 # reported as one. Surface these loudly so they are excluded by number.
