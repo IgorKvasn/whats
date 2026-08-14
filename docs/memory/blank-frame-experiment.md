@@ -123,11 +123,17 @@ npm run record-blank-frames -- \
   --out docs/memory/blank-frame-<date>/cheap-only/summary.json
 ```
 
-Repeat for `no-paint-when-hidden` and `control`. Each trial quits any running
-instance, relaunches under the chosen configuration, shows the window 5s after
-page load for 2.5s, then exits. Memory is captured at T+10s and T+60s on trial
-3 only: every trial is an identical launch, so one reading per configuration is
-representative and 30 would add half an hour per configuration.
+Repeat for `no-paint-when-hidden` and `control`. Each trial relaunches the app
+under the chosen configuration, shows the window 5s after page load for 2.5s,
+then exits.
+
+Memory is captured once per configuration, in its own launch after the trials.
+It cannot be taken inside a trial: a trial lives ~9s, so it dies before the
+T+10s reading and never reaches T+60s. The memory launch omits the trial
+variable, which leaves the trial hook inert and the app tray-resident — the same
+scenario the [#42 baseline](./baseline-2026-08-14.md) measures, and where these
+options actually cost their memory. One reading per configuration is enough
+because every launch under a configuration is identical.
 
 Results land in `docs/memory/blank-frame-<date>/<config>/`.
 

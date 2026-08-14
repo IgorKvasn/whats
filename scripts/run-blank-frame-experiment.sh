@@ -48,10 +48,6 @@ if ! rg -q '"startMinimizedToTray": true' "${SETTINGS}" 2>/dev/null; then
   exit 1
 fi
 
-# Memory is captured on this trial only; every trial is an identical launch, so
-# one reading per configuration is representative and 30 would add 30 minutes.
-MEMORY_TRIAL=3
-
 log "Configuration: ${CONFIG}, ${TRIALS} trials"
 echo "Watch the window on each trial. A '>>> trial N' line prints at the moment"
 echo "the window appears; note any number that shows a blank or white frame."
@@ -79,21 +75,6 @@ for trial in $(seq 1 "${TRIALS}"); do
     "${EXECUTABLE}" --ozone-platform=wayland >"${OUT_DIR}/app-${trial}.log" 2>&1 &
   APP_PID=$!
 
-  # Backgrounded so the app's own lifecycle drives the trial; run inline this
-  # blocks until the capture finishes, and the app has exited by then.
-  #
-  # T+10s only: a trial lives ~14s (load, one show, exit), so a T+60s reading is
-  # not obtainable here. The tray-resident T+60s figure comes from the #42
-  # baseline protocol, which keeps the app running.
-  if [[ "${trial}" -eq "${MEMORY_TRIAL}" ]]; then
-    echo "    (also capturing memory at T+10s)"
-    (cd "${REPO_ROOT}" && npm run --silent measure-memory -- \
-      --at 10 --json --exe "${EXECUTABLE}") > "${OUT_DIR}/memory.json" \
-      2>"${OUT_DIR}/memory.err" \
-      || echo "    memory capture failed; see memory.err" >&2 &
-    MEMORY_PID=$!
-  fi
-
   # Announce the trial when the window is actually on screen, not at launch: the
   # show happens several seconds into the process (page load, then the settle
   # delay in src/main/index.ts), so a
@@ -119,13 +100,8 @@ for trial in $(seq 1 "${TRIALS}"); do
   # immediately without ever showing a window.
   wait "${APP_PID}" 2>/dev/null || true
 
-  if [[ "${trial}" -eq "${MEMORY_TRIAL}" ]]; then
-    wait "${MEMORY_PID}" 2>/dev/null || true
-  fi
-
   # Reap the watcher only after the app has exited, which means the show has
-  # already happened or never will. Killing it outright would suppress the
-  # banner on the trial whose loop lingers for the memory capture.
+  # already happened or never will.
   wait "${BANNER_PID}" 2>/dev/null || kill "${BANNER_PID}" 2>/dev/null || true
 
   # The lock and tray icon outlive the process briefly; the next launch must not
@@ -140,6 +116,28 @@ done
 
 RECORDED=$(rg -c '"kind":"trial"' "${TRIAL_LOG}" 2>/dev/null || echo 0)
 log "${CONFIG}: ${RECORDED} of ${TRIALS} trials recorded"
+
+# Memory gets its own launch, not a trial. A trial lives ~9s (load, 5s settle,
+# one 2.5s show, exit), so it dies before the T+10s reading and cannot reach
+# T+60s at all. This launch omits WHATS_BLANK_TRIAL, which leaves the trial hook
+# inert, so the app sits in the tray exactly as it ships -- the same
+# tray-resident scenario the #42 baseline measures, and where these options cost
+# their memory.
+log "Capturing memory for ${CONFIG} (tray-resident, ~70s)"
+WHATS_EXPERIMENT_CONFIG="${CONFIG}" \
+  "${EXECUTABLE}" --ozone-platform=wayland >"${OUT_DIR}/app-memory.log" 2>&1 &
+MEMORY_APP_PID=$!
+
+if (cd "${REPO_ROOT}" && npm run --silent measure-memory -- \
+  --at 10,60 --json --exe "${EXECUTABLE}") >"${OUT_DIR}/memory.json" \
+  2>"${OUT_DIR}/memory.err"; then
+  echo "    memory written to ${OUT_DIR}/memory.json"
+else
+  echo "    memory capture failed; see ${OUT_DIR}/memory.err" >&2
+fi
+
+kill "${MEMORY_APP_PID}" 2>/dev/null || true
+wait "${MEMORY_APP_PID}" 2>/dev/null || true
 
 # A trial that never showed a window is not a blank frame, and must not be
 # reported as one. Surface these loudly so they are excluded by number.
