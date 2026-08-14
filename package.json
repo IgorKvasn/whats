@@ -1,7 +1,7 @@
 {
   "name": "whats",
   "private": true,
-  "version": "1.17.0",
+  "version": "1.16.2",
   "description": "Unofficial desktop client for WhatsApp Web",
   "author": "Igor Kvasnicka <ikvaso@gmail.com>",
   "type": "module",
@@ -12,8 +12,6 @@
     "postinstall": "electron-builder install-app-deps",
     "package": "electron-vite build && electron-builder --linux deb",
     "test": "vitest run",
-    "measure-memory": "node --experimental-strip-types --no-warnings scripts/measure-memory.mjs",
-    "record-blank-frames": "node --experimental-strip-types --no-warnings scripts/record-blank-frames.mjs",
     "prepare": "husky"
   },
   "dependencies": {

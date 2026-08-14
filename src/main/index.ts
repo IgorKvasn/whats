@@ -83,15 +83,14 @@ async function initialize(): Promise<void> {
     minHeight: 400,
     show: false,
     backgroundColor: '#111b21',
-    // paintWhenInitiallyHidden is deliberately not set: it defaults to true, so
-    // passing it explicitly was a no-op (see docs/memory/blank-frame-experiment.md).
+    // Keep compositing the page while the window is hidden (tray / start-minimized);
+    // without this Chromium can show a blank frame on the first show().
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: preloadWhatsappPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // Keep the renderer unthrottled while hidden in the tray; part of the
-      // c3057c4 blank-window fix, still unproven but not weakened here.
       backgroundThrottling: false,
     },
   });
@@ -153,7 +152,6 @@ async function initialize(): Promise<void> {
   if (settings.autoUpdateCheckEnabled) {
     setTimeout(() => runStartupCheck(), 5000);
   }
-
 }
 
 function registerIpcHandlers(iconDir: string): void {
