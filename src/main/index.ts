@@ -37,6 +37,8 @@ import {
 import { installAutoReload, MAIN_URL, type AutoReloadController } from './reload';
 import { ReconnectOverlay } from './reconnectOverlay';
 import { shouldShowIncomingNotification } from './notificationPolicy';
+import { readConfiguration, resolveWindowOptions, parseCycleCount } from './blankFrameExperiment';
+import { runCycles } from './blankFrameRunner';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings: Settings = loadSettings(settingsPath);
@@ -75,6 +77,16 @@ async function initialize(): Promise<void> {
   const preloadDialogPath = path.join(__dirname, '../preload/index.cjs');
   const preloadWhatsappPath = path.join(__dirname, '../preload/whatsapp.cjs');
 
+  // Both values match the shipped configuration unless WHATS_EXPERIMENT_CONFIG
+  // overrides them; see docs/memory/blank-frame-experiment.md (issue #43).
+  const experimentOptions = resolveWindowOptions(process.env);
+  if (readConfiguration(process.env) === null) {
+    console.error(
+      `[experiment] unknown WHATS_EXPERIMENT_CONFIG=${process.env.WHATS_EXPERIMENT_CONFIG}; ` +
+        `using the shipped configuration`,
+    );
+  }
+
   const mainWindow = new BrowserWindow({
     title: 'WhatsApp',
     width: 1200,
@@ -85,13 +97,13 @@ async function initialize(): Promise<void> {
     backgroundColor: '#111b21',
     // Keep compositing the page while the window is hidden (tray / start-minimized);
     // without this Chromium can show a blank frame on the first show().
-    paintWhenInitiallyHidden: true,
+    paintWhenInitiallyHidden: experimentOptions.paintWhenInitiallyHidden,
     webPreferences: {
       preload: preloadWhatsappPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      backgroundThrottling: false,
+      backgroundThrottling: experimentOptions.backgroundThrottling,
     },
   });
 
@@ -152,6 +164,37 @@ async function initialize(): Promise<void> {
   if (settings.autoUpdateCheckEnabled) {
     setTimeout(() => runStartupCheck(), 5000);
   }
+
+  startBlankFrameExperiment(mainWindow);
+}
+
+// Scripted hide/show cycles for issue #43. Inert unless WHATS_BLANK_CYCLES is
+// set. Cycles start only once the page has loaded, so they measure repainting
+// an already-loaded page rather than first load.
+function startBlankFrameExperiment(mainWindow: BrowserWindow): void {
+  const cycleCount = parseCycleCount(process.env.WHATS_BLANK_CYCLES);
+  if (cycleCount === 0) {
+    return;
+  }
+
+  const logPath = process.env.WHATS_BLANK_LOG;
+  if (!logPath) {
+    console.error('[experiment] WHATS_BLANK_CYCLES is set but WHATS_BLANK_LOG is not; not running');
+    return;
+  }
+
+  const configuration = readConfiguration(process.env);
+  mainWindow.webContents.once('did-finish-load', () => {
+    setTimeout(() => {
+      void runCycles(mainWindow, {
+        cycleCount,
+        configurationId: configuration?.id ?? 'unknown',
+        logPath,
+      }).then(() => {
+        console.log('[experiment] cycles complete');
+      });
+    }, 10000);
+  });
 }
 
 function registerIpcHandlers(iconDir: string): void {
