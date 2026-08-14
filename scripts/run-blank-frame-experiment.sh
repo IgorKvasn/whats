@@ -56,41 +56,62 @@ log "Configuration: ${CONFIG}, ${TRIALS} trials"
 echo "Watch the window on each trial. Note any trial number that shows a blank"
 echo "or white frame; you will enter them once at the end."
 
-for trial in $(seq 1 "${TRIALS}"); do
-  pkill -f "^${EXECUTABLE}$" 2>/dev/null || true
-  # The tray icon and single-instance lock outlive the main process briefly;
-  # launching too early attaches to the dying instance instead of starting a
-  # fresh one, which would leave the window already shown.
-  sleep 4
+SKIPPED=()
 
+for trial in $(seq 1 "${TRIALS}"); do
   printf '\033[1m  trial %s/%s\033[0m\n' "${trial}" "${TRIALS}"
 
   WHATS_EXPERIMENT_CONFIG="${CONFIG}" \
   WHATS_BLANK_TRIAL="${trial}" \
   WHATS_BLANK_LOG="${TRIAL_LOG}" \
     "${EXECUTABLE}" --ozone-platform=wayland >"${OUT_DIR}/app-${trial}.log" 2>&1 &
+  APP_PID=$!
 
+  # Backgrounded so the app's own lifecycle drives the trial; run inline this
+  # blocks until the capture finishes, and the app has exited by then.
+  #
+  # T+10s only: a trial lives ~14s (load, one show, exit), so a T+60s reading is
+  # not obtainable here. The tray-resident T+60s figure comes from the #42
+  # baseline protocol, which keeps the app running.
   if [[ "${trial}" -eq "${MEMORY_TRIAL}" ]]; then
-    echo "    (also capturing memory at T+10s and T+60s)"
+    echo "    (also capturing memory at T+10s)"
     (cd "${REPO_ROOT}" && npm run --silent measure-memory -- \
-      --at 10,60 --json --exe "${EXECUTABLE}") > "${OUT_DIR}/memory.json" \
-      || echo "    memory capture failed; continuing" >&2
+      --at 10 --json --exe "${EXECUTABLE}") > "${OUT_DIR}/memory.json" \
+      2>"${OUT_DIR}/memory.err" \
+      || echo "    memory capture failed; see memory.err" >&2 &
+    MEMORY_PID=$!
   fi
 
-  # The app shows its window 8s after page load and exits itself afterwards.
-  # Wait for that exit rather than a fixed sleep, so a slow load cannot let the
-  # next launch overlap this one.
-  for _ in $(seq 1 60); do
-    if ! pgrep -f "^${EXECUTABLE}$" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
-done
+  # Wait on the pid we launched. Matching by command pattern is unreliable here:
+  # the real argv carries --ozone-platform and Electron's helper processes share
+  # the executable path, so a pattern either misses the process or matches a
+  # helper. A miss is silent and costly -- it lets the next launch start while
+  # this instance still holds the single-instance lock, so the new process exits
+  # immediately without ever showing a window.
+  wait "${APP_PID}" 2>/dev/null || true
 
-pkill -f "^${EXECUTABLE}$" 2>/dev/null || true
+  if [[ "${trial}" -eq "${MEMORY_TRIAL}" ]]; then
+    wait "${MEMORY_PID}" 2>/dev/null || true
+  fi
+
+  # The lock and tray icon outlive the process briefly; the next launch must not
+  # attach to the dying instance, which would leave its window already shown.
+  sleep 3
+
+  if ! rg -q "\"index\":${trial}," "${TRIAL_LOG}" 2>/dev/null; then
+    printf '    \033[1;33mno show recorded; not counted\033[0m\n'
+    SKIPPED+=("${trial}")
+  fi
+done
 
 RECORDED=$(rg -c '"kind":"trial"' "${TRIAL_LOG}" 2>/dev/null || echo 0)
 log "${CONFIG}: ${RECORDED} of ${TRIALS} trials recorded"
+
+# A trial that never showed a window is not a blank frame, and must not be
+# reported as one. Surface these loudly so they are excluded by number.
+if [[ ${#SKIPPED[@]} -gt 0 ]]; then
+  printf '\033[1;33mTrials that never showed a window (ignore these numbers): %s\033[0m\n' \
+    "${SKIPPED[*]}"
+fi
 echo "Record the blank ones with:"
 echo "  npm run record-blank-frames -- --log ${TRIAL_LOG} --out ${OUT_DIR}/summary.json"
