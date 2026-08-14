@@ -66,22 +66,24 @@ describe('readConfiguration', () => {
   });
 });
 
-// These are the values that reach the BrowserWindow, so they guard the promise
-// that a normal launch is untouched by the experiment.
+// Mirrors how src/main/index.ts assembles the BrowserWindow options, so these
+// guard the promise that a normal launch is untouched by the experiment.
+// paintWhenInitiallyHidden is omitted rather than set to true: true is
+// Chromium's default, so passing it was a no-op, and the experiment only ever
+// needs to pass false.
 describe('window options from the selected configuration', () => {
   const windowOptions = (environment: Record<string, string | undefined>) => {
     const { configuration } = readConfiguration(environment);
     return {
-      paintWhenInitiallyHidden: configuration.paintWhenInitiallyHidden,
+      ...(configuration.paintWhenInitiallyHidden ? {} : { paintWhenInitiallyHidden: false }),
       backgroundThrottling: configuration.backgroundThrottling,
     };
   };
 
-  it('leaves a normal run on the shipped values', () => {
-    expect(windowOptions({})).toEqual({
-      paintWhenInitiallyHidden: true,
-      backgroundThrottling: false,
-    });
+  it('leaves a normal run on the shipped values, without setting the default', () => {
+    const options = windowOptions({});
+    expect(options).toEqual({ backgroundThrottling: false });
+    expect('paintWhenInitiallyHidden' in options).toBe(false);
   });
 
   it('applies the selected configuration', () => {
@@ -93,7 +95,6 @@ describe('window options from the selected configuration', () => {
 
   it('falls back to the shipped values for an unknown id', () => {
     expect(windowOptions({ WHATS_EXPERIMENT_CONFIG: 'nonsense' })).toEqual({
-      paintWhenInitiallyHidden: true,
       backgroundThrottling: false,
     });
   });

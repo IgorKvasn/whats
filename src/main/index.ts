@@ -77,8 +77,8 @@ async function initialize(): Promise<void> {
   const preloadDialogPath = path.join(__dirname, '../preload/index.cjs');
   const preloadWhatsappPath = path.join(__dirname, '../preload/whatsapp.cjs');
 
-  // Both values match the shipped configuration unless WHATS_EXPERIMENT_CONFIG
-  // overrides them; see docs/memory/blank-frame-experiment.md (issue #43).
+  // Resolves to the shipped behaviour unless WHATS_EXPERIMENT_CONFIG overrides
+  // it; see docs/memory/blank-frame-experiment.md (issue #43).
   const { configuration: experimentOptions, recognised } = readConfiguration(process.env);
   if (!recognised) {
     console.error(
@@ -95,9 +95,10 @@ async function initialize(): Promise<void> {
     minHeight: 400,
     show: false,
     backgroundColor: '#111b21',
-    // Keep compositing the page while the window is hidden (tray / start-minimized);
-    // without this Chromium can show a blank frame on the first show().
-    paintWhenInitiallyHidden: experimentOptions.paintWhenInitiallyHidden,
+    // paintWhenInitiallyHidden is deliberately not set: it defaults to true, so
+    // passing true was a no-op. The experiment still needs to turn it off, and
+    // only ever passes false; see docs/memory/blank-frame-experiment.md (#43).
+    ...(experimentOptions.paintWhenInitiallyHidden ? {} : { paintWhenInitiallyHidden: false }),
     webPreferences: {
       preload: preloadWhatsappPath,
       contextIsolation: true,

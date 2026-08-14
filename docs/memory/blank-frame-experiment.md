@@ -12,8 +12,13 @@ at once:
 Because all four landed together, which one fixed the bug was unknown. This
 experiment isolates the two expensive ones.
 
-**This document does not change the shipped configuration.** Acting on the
+**The experiment does not change the shipped behaviour.** Acting on the
 recommendation is deliberately a separate change.
+
+One exception, made after the results were in: the no-op
+`paintWhenInitiallyHidden: true` line was deleted (see Recommendation). It set
+Electron's default, so shipped *behaviour* is unchanged; none of the four
+remedies was weakened.
 
 ## Finding that reshaped the experiment
 
@@ -260,6 +265,10 @@ To actually settle it, the missing piece is the control's blank rate:
   `backgroundThrottling` — which is where the memory cost actually is — so the
   two remedies are separable by method as well as by cost.
 
-Also note remedy 3 is inert regardless: `paintWhenInitiallyHidden: true` sets
-Electron's own default, so the shipped line can be deleted as dead
-configuration whenever convenient, independent of any of the above.
+Remedy 3 has since been removed, which is the one change this work did make to
+the shipped window options. `paintWhenInitiallyHidden: true` set Electron's own
+default (verified in `electron.d.ts`: *"Default is `true`."*), so passing it was
+a no-op and deleting it cannot change behaviour — this is not the A/B decision
+above, which remains undetermined. The option is now only ever passed when the
+experiment turns it *off*; a normal launch omits the key. Nothing listens for
+`ready-to-show`, the sole event the option affects, so no listener regressed.
