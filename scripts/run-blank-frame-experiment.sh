@@ -53,14 +53,26 @@ fi
 MEMORY_TRIAL=3
 
 log "Configuration: ${CONFIG}, ${TRIALS} trials"
-echo "Watch the window on each trial. Note any trial number that shows a blank"
-echo "or white frame; you will enter them once at the end."
+echo "Watch the window on each trial. A '>>> trial N' line prints at the moment"
+echo "the window appears; note any number that shows a blank or white frame."
 
 SKIPPED=()
 
-for trial in $(seq 1 "${TRIALS}"); do
-  printf '\033[1m  trial %s/%s\033[0m\n' "${trial}" "${TRIALS}"
+# The observer reads these live, so they must not sit in a pipe buffer: piping
+# this script through anything that buffers (tail, less) would hold every trial
+# banner until the run ended, leaving nothing to watch against. Write to the
+# terminal directly when there is one.
+# Test by opening, not with -w: /dev/tty can pass a permission test and still
+# fail to open when the process has no controlling terminal. The redirection
+# failure message comes from the shell, not the command, so silence it here.
+if { exec {BANNER}>/dev/tty; } 2>/dev/null; then
+  :
+else
+  exec {BANNER}>&2
+fi
+banner() { printf "$@" >&${BANNER}; }
 
+for trial in $(seq 1 "${TRIALS}"); do
   WHATS_EXPERIMENT_CONFIG="${CONFIG}" \
   WHATS_BLANK_TRIAL="${trial}" \
   WHATS_BLANK_LOG="${TRIAL_LOG}" \
@@ -82,6 +94,22 @@ for trial in $(seq 1 "${TRIALS}"); do
     MEMORY_PID=$!
   fi
 
+  # Announce the trial when the window is actually on screen, not at launch: the
+  # show happens ~11s into the process (page load, then the settle delay), so a
+  # banner printed at launch points the observer at the wrong moment. The app
+  # logs the line below as it shows, which is the exact instant to look.
+  (
+    for _ in $(seq 1 400); do
+      if rg -q "trial ${trial} shown" "${OUT_DIR}/app-${trial}.log" 2>/dev/null; then
+        banner '\033[1m  >>> trial %s/%s  <-- LOOK NOW\033[0m\n' "${trial}" "${TRIALS}"
+        exit 0
+      fi
+      sleep 0.1
+    done
+    banner '\033[1;33m  trial %s/%s: never showed\033[0m\n' "${trial}" "${TRIALS}"
+  ) &
+  BANNER_PID=$!
+
   # Wait on the pid we launched. Matching by command pattern is unreliable here:
   # the real argv carries --ozone-platform and Electron's helper processes share
   # the executable path, so a pattern either misses the process or matches a
@@ -94,12 +122,17 @@ for trial in $(seq 1 "${TRIALS}"); do
     wait "${MEMORY_PID}" 2>/dev/null || true
   fi
 
+  # Reap the watcher only after the app has exited, which means the show has
+  # already happened or never will. Killing it outright would suppress the
+  # banner on the trial whose loop lingers for the memory capture.
+  wait "${BANNER_PID}" 2>/dev/null || kill "${BANNER_PID}" 2>/dev/null || true
+
   # The lock and tray icon outlive the process briefly; the next launch must not
   # attach to the dying instance, which would leave its window already shown.
   sleep 3
 
   if ! rg -q "\"index\":${trial}," "${TRIAL_LOG}" 2>/dev/null; then
-    printf '    \033[1;33mno show recorded; not counted\033[0m\n'
+    banner '    \033[1;33mno show recorded; not counted\033[0m\n'
     SKIPPED+=("${trial}")
   fi
 done
