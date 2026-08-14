@@ -7,10 +7,12 @@
 # One trial per launch, because paintWhenInitiallyHidden only governs a window
 # that has never been shown; cycling an already-shown window cannot detect it.
 #
-# Frames are judged by eye. GNOME on Wayland only offers an interactive
-# screenshot portal, which needs a click per shot, so automated capture per
-# trial is not possible on this platform. Start the observer (printed below)
-# in a second terminal before answering the prompt here.
+# Frames are judged by eye: GNOME on Wayland only offers an interactive
+# screenshot portal, needing a click per shot, so automated capture per trial is
+# not possible. Watch the screen and note the trial numbers printed here that
+# showed a blank or white frame, then record them with:
+#
+#   npm run record-blank-frames -- --log <trials.jsonl> --out <summary.json>
 #
 # Usage:
 #   scripts/run-blank-frame-experiment.sh <cheap-only|no-paint-when-hidden|control> [trials]
@@ -47,16 +49,12 @@ if ! rg -q '"startMinimizedToTray": true' "${SETTINGS}" 2>/dev/null; then
 fi
 
 # Memory is captured on this trial only; every trial is an identical launch, so
-# one reading per configuration is representative and 30 would cost 30 minutes.
+# one reading per configuration is representative and 30 would add 30 minutes.
 MEMORY_TRIAL=3
 
 log "Configuration: ${CONFIG}, ${TRIALS} trials"
-echo "Trial log: ${TRIAL_LOG}"
-echo
-echo "In a SECOND terminal, start the observer now:"
-echo "  cd ${REPO_ROOT} && npm run observe-blank-frames -- --log ${TRIAL_LOG} --out ${OUT_DIR}/summary.json"
-echo
-read -r -p "Press Enter once the observer is recording..."
+echo "Watch the window on each trial. Note any trial number that shows a blank"
+echo "or white frame; you will enter them once at the end."
 
 for trial in $(seq 1 "${TRIALS}"); do
   pkill -f "^${EXECUTABLE}$" 2>/dev/null || true
@@ -65,23 +63,23 @@ for trial in $(seq 1 "${TRIALS}"); do
   # fresh one, which would leave the window already shown.
   sleep 4
 
+  printf '\033[1m  trial %s/%s\033[0m\n' "${trial}" "${TRIALS}"
+
   WHATS_EXPERIMENT_CONFIG="${CONFIG}" \
   WHATS_BLANK_TRIAL="${trial}" \
   WHATS_BLANK_LOG="${TRIAL_LOG}" \
     "${EXECUTABLE}" --ozone-platform=wayland >"${OUT_DIR}/app-${trial}.log" 2>&1 &
 
   if [[ "${trial}" -eq "${MEMORY_TRIAL}" ]]; then
-    log "Trial ${trial}/${TRIALS} — also capturing memory at T+10s and T+60s"
+    echo "    (also capturing memory at T+10s and T+60s)"
     (cd "${REPO_ROOT}" && npm run --silent measure-memory -- \
       --at 10,60 --json --exe "${EXECUTABLE}") > "${OUT_DIR}/memory.json" \
-      || echo "memory capture failed; continuing" >&2
-  else
-    printf '  trial %s/%s\n' "${trial}" "${TRIALS}"
+      || echo "    memory capture failed; continuing" >&2
   fi
 
   # The app shows its window 8s after page load and exits itself afterwards.
-  # Wait for that exit rather than a fixed sleep, so a slow load cannot cause
-  # the next launch to overlap this one.
+  # Wait for that exit rather than a fixed sleep, so a slow load cannot let the
+  # next launch overlap this one.
   for _ in $(seq 1 60); do
     if ! pgrep -f "^${EXECUTABLE}$" >/dev/null 2>&1; then
       break
@@ -92,5 +90,7 @@ done
 
 pkill -f "^${EXECUTABLE}$" 2>/dev/null || true
 
-log "All ${TRIALS} trials done for ${CONFIG}"
-echo "Press q in the observer terminal to write ${OUT_DIR}/summary.json"
+RECORDED=$(rg -c '"kind":"trial"' "${TRIAL_LOG}" 2>/dev/null || echo 0)
+log "${CONFIG}: ${RECORDED} of ${TRIALS} trials recorded"
+echo "Record the blank ones with:"
+echo "  npm run record-blank-frames -- --log ${TRIAL_LOG} --out ${OUT_DIR}/summary.json"

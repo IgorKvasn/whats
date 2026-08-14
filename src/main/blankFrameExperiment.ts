@@ -28,11 +28,13 @@ export interface Trial {
   hiddenAt: number;
 }
 
-export type Attribution = 'exact' | 'reaction-window' | 'unattributed';
+export type Attribution = 'reported';
 
 export interface Observation {
-  observedAt: number;
-  trialIndex: number | null;
+  /** Always null: trials are reported by number after the run, not timestamped
+   * live. Kept so the record states how the frame was judged. */
+  observedAt: number | null;
+  trialIndex: number;
   attribution: Attribution;
 }
 
@@ -41,7 +43,6 @@ export interface RunSummary {
   trialCount: number;
   blankFrameCount: number;
   blankTrials: number[];
-  unattributedCount: number;
   observations: Observation[];
 }
 
@@ -68,10 +69,6 @@ export const CONFIGURATIONS: readonly ExperimentConfiguration[] = [
 ];
 
 const SHIPPED_CONFIGURATION_ID = 'control';
-
-// How long after a cycle is hidden a keypress still counts as reporting that
-// cycle. Covers human reaction time without reaching the next cycle's show.
-const REACTION_WINDOW_MS = 1000;
 
 function shippedConfiguration(): ExperimentConfiguration {
   const shipped = CONFIGURATIONS.find(
@@ -124,56 +121,45 @@ export function parseTrialIndex(raw: string | undefined): number {
   return count > 0 ? count : 0;
 }
 
-export function attributeObservations(trials: Trial[], observedAt: number[]): Observation[] {
-  return observedAt.map((timestamp) => {
-    const visible = trials.find(
-      (trial) => timestamp >= trial.shownAt && timestamp <= trial.hiddenAt,
-    );
-    if (visible) {
-      return { observedAt: timestamp, trialIndex: visible.index, attribution: 'exact' as const };
-    }
-
-    // The nearest preceding trial, not the first match: trials come from
-    // separate app launches, so their windows are not guaranteed ordered.
-    const justHidden = trials
-      .filter(
-        (trial) => timestamp > trial.hiddenAt && timestamp - trial.hiddenAt <= REACTION_WINDOW_MS,
-      )
-      .sort((a, b) => b.hiddenAt - a.hiddenAt)[0];
-    if (justHidden) {
-      return {
-        observedAt: timestamp,
-        trialIndex: justHidden.index,
-        attribution: 'reaction-window' as const,
-      };
-    }
-
-    return { observedAt: timestamp, trialIndex: null, attribution: 'unattributed' as const };
-  });
+export interface ReportedTrials {
+  trials: number[];
+  /** Tokens that could not be a trial in this run, echoed back so a typo is
+   * corrected rather than recorded as a blank frame. */
+  rejected: string[];
 }
 
-export function summarizeRun(
+export function parseReportedTrials(raw: string, trialCount: number): ReportedTrials {
+  const tokens = raw.split(/[\s,]+/).filter((token) => token !== '');
+  const trials = new Set<number>();
+  const rejected: string[] = [];
+
+  for (const token of tokens) {
+    const index = Number(token);
+    if (!/^\d+$/.test(token) || index < 1 || index > trialCount) {
+      rejected.push(token);
+      continue;
+    }
+    trials.add(index);
+  }
+
+  return { trials: [...trials].sort((a, b) => a - b), rejected };
+}
+
+export function summarizeReportedTrials(
   configurationId: string,
   trials: Trial[],
-  observedAt: number[],
+  blankTrials: number[],
 ): RunSummary {
-  const observations = attributeObservations(trials, observedAt);
-  const blankTrials = [
-    ...new Set(
-      observations
-        .map((observation) => observation.trialIndex)
-        .filter((index): index is number => index !== null),
-    ),
-  ].sort((a, b) => a - b);
-
+  const unique = [...new Set(blankTrials)].sort((a, b) => a - b);
   return {
     configurationId,
     trialCount: trials.length,
-    blankFrameCount: blankTrials.length,
-    blankTrials,
-    unattributedCount: observations.filter(
-      (observation) => observation.attribution === 'unattributed',
-    ).length,
-    observations,
+    blankFrameCount: unique.length,
+    blankTrials: unique,
+    observations: unique.map((trialIndex) => ({
+      observedAt: null,
+      trialIndex,
+      attribution: 'reported' as const,
+    })),
   };
 }

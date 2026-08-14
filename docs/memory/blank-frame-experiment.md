@@ -57,6 +57,31 @@ WHATS_EXPERIMENT_CONFIG=cheap-only /opt/whats/whats
 An unrecognised value logs a warning and falls back to the shipped
 configuration rather than silently measuring the wrong thing.
 
+## One trial per app launch
+
+`paintWhenInitiallyHidden` governs whether Chromium composites a window that
+**has never been shown**. Its effect therefore exists only on a window's *first*
+show.
+
+An earlier version of this harness hid and showed one long-lived window ~30
+times per configuration. That cannot detect the option at all: after the first
+show the window has been presented, so every subsequent cycle measures a
+scenario where the option no longer applies. It would have reported the cheap
+configuration as sufficient on evidence that never tested the thing in question.
+
+So each trial is one app launch: start hidden to tray, wait for the page to
+load, perform exactly one show, then exit so the next launch gets a clean first
+show. A configuration's result is the collection of those trials.
+
+This also matches where the cost is paid. The option makes Chromium build a
+compositor and paint a window that may never be shown — a startup cost, in
+exactly the tray-resident scenario the [#42 baseline](./baseline-2026-08-14.md)
+measures.
+
+The trial calls the app's real `showMainWindow()`, so it exercises the same path
+a user triggers, including the always-on-top raise that path performs on Wayland
+and the shipped forced repaint rather than a copy of it.
+
 ## How blank frames are detected
 
 **By eye.** This is a deliberate limitation forced by the platform.
@@ -66,8 +91,8 @@ it must be observed on screen. Automated capture was not available:
 
 - GNOME's Mutter on Wayland exposes only
   `org.gnome.Shell.Screenshot.InteractiveScreenshot`, which requires a user
-  click per shot. The direct `Screenshot` method returns
-  `AccessDenied` for unsandboxed callers.
+  click per shot. The direct `Screenshot` method returns `AccessDenied` for
+  unsandboxed callers.
 - `grim` and similar tools are wlroots-only and do not work under Mutter.
 - Electron's own `webContents.capturePage()` was rejected: it reads the
   renderer's surface rather than what the compositor actually put on screen, so
@@ -75,16 +100,10 @@ it must be observed on screen. Automated capture was not available:
   unpainted window itself forces compositing, perturbing the behaviour under
   test.
 
-So the harness drives the cycles and the observer watches. `scripts/run-blank-frame-experiment.sh`
-hides and shows the window on a fixed schedule, logging when each cycle was on
-screen; the observer presses SPACE on any blank or white frame, and
-`scripts/observe-blank-frames.mjs` attributes each keypress to the cycle that
-was visible at that moment.
-
-A keypress landing up to 1s after a cycle is hidden is still attributed to that
-cycle, to absorb reaction time. A keypress that matches no cycle is reported as
-`unattributedCount` rather than dropped, so an incomplete record cannot be
-mistaken for a clean run.
+The run script prints each trial number as it launches; the observer watches the
+screen and notes the numbers that showed a blank or white frame, then records
+them once at the end. A number outside the trials that ran is rejected rather
+than recorded, so a mistyped entry cannot become a false blank frame.
 
 What this costs: human observation can miss a single-frame flash that a capture
 would catch, and cannot be replayed. Counts here are a floor, not an exact
@@ -94,23 +113,27 @@ figure.
 
 Needs a packaged build at `/opt/whats/whats` containing this code, per the
 protocol in [`README.md`](./README.md) — dev-build memory is not comparable to
-the baseline.
+the baseline. Requires `startMinimizedToTray` enabled, which the script checks:
+the window must be unshown until the trial's show.
 
 ```bash
 scripts/run-blank-frame-experiment.sh cheap-only 30
-scripts/run-blank-frame-experiment.sh no-paint-when-hidden 30
-scripts/run-blank-frame-experiment.sh control 30
+npm run record-blank-frames -- \
+  --log docs/memory/blank-frame-<date>/cheap-only/trials.jsonl \
+  --out docs/memory/blank-frame-<date>/cheap-only/summary.json
 ```
 
-Each run quits any running instance, relaunches under the chosen
-configuration, captures memory at T+10s and T+60s, waits 10s after page load,
-then runs the cycles (2.5s visible, 1.5s hidden). Watch the window; press SPACE
-for any blank frame, then `q` when the app logs `cycles complete`. Results land
-in `docs/memory/blank-frame-<date>/<config>/`.
+Repeat for `no-paint-when-hidden` and `control`. Each trial quits any running
+instance, relaunches under the chosen configuration, shows the window 8s after
+page load for 2.5s, then exits. Memory is captured at T+10s and T+60s on trial
+3 only: every trial is an identical launch, so one reading per configuration is
+representative and 30 would add half an hour per configuration.
+
+Results land in `docs/memory/blank-frame-<date>/<config>/`.
 
 ## Results
 
-Not yet run. See [`RESULTS.md`](#) once the runs are complete.
+Not yet run.
 
 ## Recommendation
 

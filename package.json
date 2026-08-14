@@ -13,7 +13,7 @@
     "package": "electron-vite build && electron-builder --linux deb",
     "test": "vitest run",
     "measure-memory": "node --experimental-strip-types --no-warnings scripts/measure-memory.mjs",
-    "observe-blank-frames": "node --experimental-strip-types --no-warnings scripts/observe-blank-frames.mjs",
+    "record-blank-frames": "node --experimental-strip-types --no-warnings scripts/record-blank-frames.mjs",
     "prepare": "husky"
   },
   "dependencies": {

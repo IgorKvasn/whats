@@ -4,8 +4,8 @@ import {
   readConfiguration,
   resolveWindowOptions,
   parseTrialIndex,
-  attributeObservations,
-  summarizeRun,
+  parseReportedTrials,
+  summarizeReportedTrials,
   type Trial,
 } from '../src/main/blankFrameExperiment';
 
@@ -107,57 +107,36 @@ describe('parseTrialIndex', () => {
   });
 });
 
-describe('attributeObservations', () => {
-  const trials: Trial[] = [
-    { index: 1, shownAt: 1000, hiddenAt: 3000 },
-    { index: 2, shownAt: 5000, hiddenAt: 7000 },
-    { index: 3, shownAt: 9000, hiddenAt: 11000 },
-  ];
-
-  it('attributes a keypress to the trial that was on screen at the time', () => {
-    expect(attributeObservations(trials, [6000])).toEqual([
-      { observedAt: 6000, trialIndex: 2, attribution: 'exact' },
-    ]);
+describe('parseReportedTrials', () => {
+  it('reads a space-separated list of trial numbers', () => {
+    expect(parseReportedTrials('4 17 23', 30)).toEqual({ trials: [4, 17, 23], rejected: [] });
   });
 
-  // Reaction time means a keypress can land just after the window is hidden;
-  // blaming the next trial instead of the one just seen would be wrong.
-  it('attributes a keypress shortly after a trial ends to that trial', () => {
-    expect(attributeObservations(trials, [7300])).toEqual([
-      { observedAt: 7300, trialIndex: 2, attribution: 'reaction-window' },
-    ]);
+  it('accepts commas and extra whitespace', () => {
+    expect(parseReportedTrials(' 4, 17 ,23 ', 30)).toEqual({ trials: [4, 17, 23], rejected: [] });
   });
 
-  it('prefers the visible trial over the previous one when both could match', () => {
-    expect(attributeObservations(trials, [9100])).toEqual([
-      { observedAt: 9100, trialIndex: 3, attribution: 'exact' },
-    ]);
+  it('treats an empty answer as no blank frames', () => {
+    expect(parseReportedTrials('', 30)).toEqual({ trials: [], rejected: [] });
+    expect(parseReportedTrials('   ', 30)).toEqual({ trials: [], rejected: [] });
   });
 
-  // Trials come from separate app launches, so the log is not guaranteed to be
-  // ordered; the nearest preceding trial must win, not the first one listed.
-  it('picks the nearest preceding trial when the log is out of order', () => {
-    const unordered: Trial[] = [
-      { index: 1, shownAt: 5000, hiddenAt: 7000 },
-      { index: 2, shownAt: 1000, hiddenAt: 3000 },
-    ];
-    expect(attributeObservations(unordered, [7200])).toEqual([
-      { observedAt: 7200, trialIndex: 1, attribution: 'reaction-window' },
-    ]);
+  it('sorts and de-duplicates', () => {
+    expect(parseReportedTrials('9 4 9', 30).trials).toEqual([4, 9]);
   });
 
-  it('marks a keypress it cannot attribute rather than dropping it', () => {
-    expect(attributeObservations(trials, [20000])).toEqual([
-      { observedAt: 20000, trialIndex: null, attribution: 'unattributed' },
-    ]);
+  // A number outside the run cannot be a real observation; reporting it back is
+  // better than silently recording a blank frame for a trial that never ran.
+  it('rejects numbers outside the range of trials that ran', () => {
+    expect(parseReportedTrials('0 4 31', 30)).toEqual({ trials: [4], rejected: ['0', '31'] });
   });
 
-  it('handles a run with no observations', () => {
-    expect(attributeObservations(trials, [])).toEqual([]);
+  it('rejects tokens that are not numbers', () => {
+    expect(parseReportedTrials('4 none 7', 30)).toEqual({ trials: [4, 7], rejected: ['none'] });
   });
 });
 
-describe('summarizeRun', () => {
+describe('summarizeReportedTrials', () => {
   const trials: Trial[] = [
     { index: 1, shownAt: 1000, hiddenAt: 3000 },
     { index: 2, shownAt: 5000, hiddenAt: 7000 },
@@ -165,28 +144,21 @@ describe('summarizeRun', () => {
   ];
 
   it('reports zero blank frames for a clean run', () => {
-    const summary = summarizeRun('cheap-only', trials, []);
+    const summary = summarizeReportedTrials('cheap-only', trials, []);
     expect(summary.blankFrameCount).toBe(0);
     expect(summary.blankTrials).toEqual([]);
     expect(summary.trialCount).toBe(3);
   });
 
-  it('counts distinct blank trials rather than keypresses', () => {
-    const summary = summarizeRun('cheap-only', trials, [5500, 5600]);
-    expect(summary.blankFrameCount).toBe(1);
-    expect(summary.blankTrials).toEqual([2]);
-  });
-
-  it('lists blank trials in order', () => {
-    const summary = summarizeRun('control', trials, [9500, 1500]);
+  it('records the reported trials as blank', () => {
+    const summary = summarizeReportedTrials('control', trials, [1, 3]);
+    expect(summary.blankFrameCount).toBe(2);
     expect(summary.blankTrials).toEqual([1, 3]);
   });
 
-  // An unattributed press means the record is incomplete; a run reported as
-  // clean while a press could not be placed would overstate the result.
-  it('surfaces unattributed observations separately', () => {
-    const summary = summarizeRun('control', trials, [20000]);
-    expect(summary.blankFrameCount).toBe(0);
-    expect(summary.unattributedCount).toBe(1);
+  it('carries the observation source so the record says how frames were judged', () => {
+    expect(summarizeReportedTrials('control', trials, [2]).observations).toEqual([
+      { observedAt: null, trialIndex: 2, attribution: 'reported' },
+    ]);
   });
 });
