@@ -95,7 +95,8 @@ for trial in $(seq 1 "${TRIALS}"); do
   fi
 
   # Announce the trial when the window is actually on screen, not at launch: the
-  # show happens ~11s into the process (page load, then the settle delay), so a
+  # show happens several seconds into the process (page load, then the settle
+  # delay in src/main/index.ts), so a
   # banner printed at launch points the observer at the wrong moment. The app
   # logs the line below as it shows, which is the exact instant to look.
   (

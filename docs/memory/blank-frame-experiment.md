@@ -124,7 +124,7 @@ npm run record-blank-frames -- \
 ```
 
 Repeat for `no-paint-when-hidden` and `control`. Each trial quits any running
-instance, relaunches under the chosen configuration, shows the window 8s after
+instance, relaunches under the chosen configuration, shows the window 5s after
 page load for 2.5s, then exits. Memory is captured at T+10s and T+60s on trial
 3 only: every trial is an identical launch, so one reading per configuration is
 representative and 30 would add half an hour per configuration.

@@ -206,7 +206,7 @@ function startBlankFrameExperiment(mainWindow: BrowserWindow): void {
         console.log('[experiment] trial complete');
         app.exit(0);
       });
-    }, 8000);
+    }, 5000);
   });
 }
 
