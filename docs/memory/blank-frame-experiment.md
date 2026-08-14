@@ -139,8 +139,84 @@ Results land in `docs/memory/blank-frame-<date>/<config>/`.
 
 ## Results
 
-Not yet run.
+Run 2026-08-14 on GNOME/Mutter Wayland, packaged build 1.16.2, 30 trials per
+configuration, 90 trials total. Every trial showed a window; none was skipped.
+Frames judged by eye by the maintainer, live against per-trial markers.
+
+| configuration | trials | blank frames | RSS / PSS @T+10s | RSS / PSS @T+60s |
+|---|---|---|---|---|
+| `cheap-only` | 30 | **0** | 978 / 490 MiB | 990 / 496 MiB |
+| `no-paint-when-hidden` | 30 | **0** | 1046 / 541 MiB | 1007 / 500 MiB |
+| `control` (shipped) | 30 | **0** | 1146 / 639 MiB | 1034 / 525 MiB |
+
+Raw data in `blank-frame-20260814/<config>/` — `trials.jsonl`, `summary.json`,
+`memory.json`.
+
+### The bug did not reproduce
+
+**The control showed zero blank frames.** The control is the shipped
+configuration, the one carrying all four remedies, so zero blanks there is
+expected — but it also means the experiment never made the bug appear under
+*any* configuration, including the one with both expensive options removed.
+
+That is the finding, and it is a null result. The three configurations are
+indistinguishable on the outcome that matters. Nothing here shows the cheap
+configuration is safe; it shows only that 30 trials did not reproduce an
+intermittent bug whose base rate was never established. Issue #43 assumed the
+configurations could be separated by counting blanks, which holds only if the
+bug reproduces in the control at some usable rate. It did not.
+
+With zero events observed in 30 trials, the per-show blank rate is below roughly
+10% at 95% confidence (rule of three). A bug rare enough to sit under that
+bound — plausible for something described as intermittent — would produce
+exactly these three clean runs whether or not the expensive options do anything.
+This experiment cannot distinguish "the cheap remedies are sufficient" from
+"the bug simply did not fire".
+
+### What the memory numbers do and don't say
+
+The memory ordering is consistent and in the predicted direction —
+`cheap-only` < `no-paint-when-hidden` < `control`, about **168 MiB RSS / 149 MiB
+PSS** apart at T+10s — so the expensive options do cost real memory. But these
+are single readings per configuration, not repeated samples, and Chromium
+startup memory is noisy: the T+60s spread (990 / 1007 / 1034 MiB RSS) is a third
+of the T+10s spread, which is itself a sign of how much of the gap is startup
+transient rather than steady state. Treat the direction as credible and the
+magnitude as indicative only.
+
+Notably the GPU process is ~102-104 MiB RSS in **all three**, including
+`cheap-only` with `paintWhenInitiallyHidden: false`. The expected saving was a
+GPU process that does not build a compositor for an unshown window; that saving
+did not appear.
 
 ## Recommendation
 
-Pending results.
+**Change nothing. Keep the shipped configuration.**
+
+Not because the expensive options were shown to be required — they weren't —
+but because nothing was shown either way, and this ticket explicitly does not
+change what ships. The ticket allows for "both options are still required" as an
+outcome; the actual outcome is weaker still: *undetermined*.
+
+Recommending `cheap-only` on this data would mean removing a remedy from a fix
+for an intermittent bug on the strength of an experiment that never observed the
+bug once. The memory saving is real but modest against that risk.
+
+To actually settle it, the missing piece is the control's blank rate:
+
+- Establish that the bug reproduces at all under the *pre-`c3057c4`*
+  configuration — no forced repaint, no background colour, both expensive
+  options off. If it will not reproduce there, no A/B on 30 trials can work, and
+  the question should be closed as unfalsifiable with the current method rather
+  than re-run at greater length.
+- If it does reproduce, measure its rate there, then size the runs from that
+  rate. Separating configurations at a 5% base rate needs hundreds of trials per
+  configuration, not 30 — which in turn needs automated frame capture, since
+  that is far past what eye observation can sustain.
+- Worth testing first: whether the forced repaint alone (remedy 1, cheap) is
+  what fixed it. That is the hypothesis this experiment was not built to test,
+  since all three configurations here keep it.
+
+Also note remedy 3 is inert regardless: `paintWhenInitiallyHidden: true` sets
+Electron's own default, so the shipped line can be deleted as dead
+configuration whenever convenient, independent of any of the above.
