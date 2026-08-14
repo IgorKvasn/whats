@@ -1,81 +1,64 @@
-// Drives the scripted hide/show cycles for the blank-window experiment
-// (issue #43) and records when each cycle was on screen, so a human observer's
-// keypresses can be attributed to a cycle afterwards.
+// Drives one trial of the blank-window experiment (issue #43) and records when
+// the window was on screen, so a human observer's keypresses can be attributed
+// to a trial afterwards.
 //
-// Runs only when WHATS_BLANK_CYCLES is set, so a normal launch never enters it.
+// One trial per app launch. `paintWhenInitiallyHidden` governs whether Chromium
+// composites a window that has *never been shown*, so its effect exists only on
+// a window's first show; cycling an already-shown window in one process cannot
+// detect it. Each trial therefore measures a single first show of a freshly
+// launched, tray-hidden app.
+//
+// Runs only when WHATS_BLANK_TRIAL is set, so a normal launch never enters it.
 
 import { appendFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { BrowserWindow } from 'electron';
-import { type Cycle } from './blankFrameExperiment';
 
-export interface RunnerOptions {
-  cycleCount: number;
+export interface TrialOptions {
+  trialIndex: number;
   configurationId: string;
   logPath: string;
   // How long the window stays visible: long enough for the observer to judge
   // the frame, and long enough for a slow repaint to resolve itself.
   dwellMs?: number;
-  hiddenMs?: number;
 }
 
 const DEFAULT_DWELL_MS = 2500;
-const DEFAULT_HIDDEN_MS = 1500;
 
 function record(logPath: string, entry: unknown): void {
   appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf-8');
 }
 
 /**
- * Cycle timings use Date.now() rather than a monotonic clock because the
- * observer's keypresses are timestamped by a separate process, and wall clock
- * is the only shared reference between the two.
+ * Timings use Date.now() rather than a monotonic clock because the observer's
+ * keypresses are timestamped by a separate process, and wall clock is the only
+ * shared reference between the two.
+ *
+ * `show` must be the app's real show path so the trial exercises what a user
+ * triggers, including the always-on-top raise that path performs on Wayland.
  */
-export async function runCycles(
+export async function runTrial(
   window: BrowserWindow,
-  options: RunnerOptions,
-): Promise<Cycle[]> {
+  show: () => void,
+  options: TrialOptions,
+): Promise<void> {
   const dwellMs = options.dwellMs ?? DEFAULT_DWELL_MS;
-  const hiddenMs = options.hiddenMs ?? DEFAULT_HIDDEN_MS;
-  const cycles: Cycle[] = [];
 
-  record(options.logPath, {
-    kind: 'run-start',
-    configurationId: options.configurationId,
-    cycleCount: options.cycleCount,
-    dwellMs,
-    hiddenMs,
-    at: Date.now(),
-  });
-
-  for (let index = 1; index <= options.cycleCount; index += 1) {
-    if (window.isDestroyed()) {
-      break;
-    }
-
-    window.hide();
-    await delay(hiddenMs);
-    if (window.isDestroyed()) {
-      break;
-    }
-
-    const shownAt = Date.now();
-    window.show();
-    window.focus();
-    window.webContents.invalidate();
-    setImmediate(() => {
-      if (!window.isDestroyed()) window.webContents.invalidate();
-    });
-
-    await delay(dwellMs);
-    const hiddenAt = Date.now();
-
-    const cycle = { index, shownAt, hiddenAt };
-    cycles.push(cycle);
-    record(options.logPath, { kind: 'cycle', ...cycle });
-    console.log(`[experiment] cycle ${index}/${options.cycleCount}`);
+  if (window.isDestroyed()) {
+    return;
   }
 
-  record(options.logPath, { kind: 'run-end', at: Date.now() });
-  return cycles;
+  const shownAt = Date.now();
+  show();
+  await delay(dwellMs);
+  const hiddenAt = Date.now();
+
+  record(options.logPath, {
+    kind: 'trial',
+    index: options.trialIndex,
+    configurationId: options.configurationId,
+    shownAt,
+    hiddenAt,
+  });
+  console.log(`[experiment] trial ${options.trialIndex} shown`);
 }

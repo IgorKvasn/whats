@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 // Records a human observer's blank-frame reports for the experiment in issue
-// #43 and attributes each to a hide/show cycle.
+// #43 and attributes each to a trial.
 //
 // Screen capture is not available on a GNOME Wayland session without an
 // interactive portal prompt per shot, so the frames are judged by eye. Press
-// SPACE whenever the window shows a blank or white frame; press q when the app
-// reports that its cycles are complete.
+// SPACE whenever a window shows a blank or white frame; press q when the run
+// script reports that all trials are done.
+//
+// One trial is one app launch, so this runs for the whole configuration while
+// the run script relaunches the app repeatedly.
 //
 // Usage:
-//   node scripts/observe-blank-frames.mjs --log <cycles.jsonl> --out <summary.json>
+//   npm run observe-blank-frames -- --log <trials.jsonl> --out <summary.json>
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { summarizeRun } from '../src/main/blankFrameExperiment.ts';
@@ -31,19 +34,18 @@ function parseArguments(argv) {
   return options;
 }
 
-async function readCycleLog(path) {
+async function readTrialLog(path) {
   const raw = await readFile(path, 'utf8');
-  const entries = raw
+  const trials = raw
     .split('\n')
     .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line));
+    .map((line) => JSON.parse(line))
+    .filter((entry) => entry.kind === 'trial');
 
-  const start = entries.find((entry) => entry.kind === 'run-start');
-  const cycles = entries
-    .filter((entry) => entry.kind === 'cycle')
-    .map(({ index, shownAt, hiddenAt }) => ({ index, shownAt, hiddenAt }));
-
-  return { configurationId: start?.configurationId ?? 'unknown', cycles };
+  return {
+    configurationId: trials[0]?.configurationId ?? 'unknown',
+    trials: trials.map(({ index, shownAt, hiddenAt }) => ({ index, shownAt, hiddenAt })),
+  };
 }
 
 function collectKeypresses() {
@@ -93,31 +95,33 @@ async function main() {
     options = parseArguments(process.argv.slice(2));
   } catch (error) {
     console.error(`${error.message}\n`);
-    console.error('Usage: node scripts/observe-blank-frames.mjs --log <cycles.jsonl> --out <summary.json>');
+    console.error(
+      'Usage: npm run observe-blank-frames -- --log <trials.jsonl> --out <summary.json>',
+    );
     process.exitCode = 2;
     return;
   }
 
   const observedAt = await collectKeypresses();
 
-  const { configurationId, cycles } = await readCycleLog(options.log);
-  if (cycles.length === 0) {
-    console.error(`\nNo cycles found in ${options.log}. Did the app run with WHATS_BLANK_CYCLES set?`);
+  const { configurationId, trials } = await readTrialLog(options.log);
+  if (trials.length === 0) {
+    console.error(`\nNo trials found in ${options.log}. Did the app run with WHATS_BLANK_TRIAL set?`);
     process.exitCode = 1;
     return;
   }
 
-  const summary = summarizeRun(configurationId, cycles, observedAt);
+  const summary = summarizeRun(configurationId, trials, observedAt);
   await writeFile(options.out, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
 
   console.log(`\n=== ${summary.configurationId} ===`);
-  console.log(`Cycles:              ${summary.cycleCount}`);
+  console.log(`Trials:              ${summary.trialCount}`);
   console.log(`Blank frames:        ${summary.blankFrameCount}`);
-  console.log(`Blank cycles:        ${summary.blankCycles.join(', ') || '(none)'}`);
+  console.log(`Blank trials:        ${summary.blankTrials.join(', ') || '(none)'}`);
   if (summary.unattributedCount > 0) {
     console.log(
       `Unattributed presses: ${summary.unattributedCount}  ` +
-        `<- landed outside any cycle; record is incomplete`,
+        `<- landed outside any trial; record is incomplete`,
     );
   }
   console.log(`\nWritten to ${options.out}`);

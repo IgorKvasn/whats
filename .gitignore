@@ -26,3 +26,6 @@ out
 
 .vexp
 .superpowers/
+
+# Bundled main process written to the repo root when electron is run against `.`
+/index.js

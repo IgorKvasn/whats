@@ -37,8 +37,8 @@ import {
 import { installAutoReload, MAIN_URL, type AutoReloadController } from './reload';
 import { ReconnectOverlay } from './reconnectOverlay';
 import { shouldShowIncomingNotification } from './notificationPolicy';
-import { readConfiguration, resolveWindowOptions, parseCycleCount } from './blankFrameExperiment';
-import { runCycles } from './blankFrameRunner';
+import { readConfiguration, resolveWindowOptions, parseTrialIndex } from './blankFrameExperiment';
+import { runTrial } from './blankFrameRunner';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings: Settings = loadSettings(settingsPath);
@@ -80,7 +80,7 @@ async function initialize(): Promise<void> {
   // Both values match the shipped configuration unless WHATS_EXPERIMENT_CONFIG
   // overrides them; see docs/memory/blank-frame-experiment.md (issue #43).
   const experimentOptions = resolveWindowOptions(process.env);
-  if (readConfiguration(process.env) === null) {
+  if (!readConfiguration(process.env).recognised) {
     console.error(
       `[experiment] unknown WHATS_EXPERIMENT_CONFIG=${process.env.WHATS_EXPERIMENT_CONFIG}; ` +
         `using the shipped configuration`,
@@ -168,32 +168,45 @@ async function initialize(): Promise<void> {
   startBlankFrameExperiment(mainWindow);
 }
 
-// Scripted hide/show cycles for issue #43. Inert unless WHATS_BLANK_CYCLES is
-// set. Cycles start only once the page has loaded, so they measure repainting
-// an already-loaded page rather than first load.
+// One first-show trial for issue #43. Inert unless WHATS_BLANK_TRIAL is set.
+// The window must never have been shown before the trial, which is what makes
+// paintWhenInitiallyHidden observable, so this requires startMinimizedToTray
+// and quits afterwards to leave the next launch a clean first show.
 function startBlankFrameExperiment(mainWindow: BrowserWindow): void {
-  const cycleCount = parseCycleCount(process.env.WHATS_BLANK_CYCLES);
-  if (cycleCount === 0) {
+  const trialIndex = parseTrialIndex(process.env.WHATS_BLANK_TRIAL);
+  if (trialIndex === 0) {
     return;
   }
 
   const logPath = process.env.WHATS_BLANK_LOG;
   if (!logPath) {
-    console.error('[experiment] WHATS_BLANK_CYCLES is set but WHATS_BLANK_LOG is not; not running');
+    console.error('[experiment] WHATS_BLANK_TRIAL is set but WHATS_BLANK_LOG is not; not running');
     return;
   }
 
-  const configuration = readConfiguration(process.env);
+  if (!settings.startMinimizedToTray) {
+    console.error(
+      '[experiment] startMinimizedToTray must be enabled: the window has to be unshown ' +
+        'until the trial for paintWhenInitiallyHidden to have any effect',
+    );
+    app.exit(2);
+    return;
+  }
+
+  const { configuration } = readConfiguration(process.env);
   mainWindow.webContents.once('did-finish-load', () => {
+    // Let the page settle before the show, so the trial measures presenting a
+    // loaded page rather than racing first paint.
     setTimeout(() => {
-      void runCycles(mainWindow, {
-        cycleCount,
-        configurationId: configuration?.id ?? 'unknown',
+      void runTrial(mainWindow, showMainWindow, {
+        trialIndex,
+        configurationId: configuration.id,
         logPath,
       }).then(() => {
-        console.log('[experiment] cycles complete');
+        console.log('[experiment] trial complete');
+        app.exit(0);
       });
-    }, 10000);
+    }, 8000);
   });
 }
 

@@ -5,20 +5,24 @@
 // single packaged build can exercise every configuration, and so the shipped
 // defaults stay exactly as they are when the variables are absent. This is
 // measurement scaffolding, not a feature: nothing here runs on a normal launch.
+//
+// One trial per app launch, because `paintWhenInitiallyHidden` only affects a
+// window that has never been shown. Trials from many launches are collected
+// into one run and summarized here.
 
 export interface ExperimentConfiguration {
   id: string;
-  description: string;
   paintWhenInitiallyHidden: boolean;
   backgroundThrottling: boolean;
 }
 
-export interface WindowOptions {
+export interface ExperimentWindowOptions {
   paintWhenInitiallyHidden: boolean;
   backgroundThrottling: boolean;
 }
 
-export interface Cycle {
+/** One first-show of a freshly launched, tray-hidden app. */
+export interface Trial {
   index: number;
   shownAt: number;
   hiddenAt: number;
@@ -28,15 +32,15 @@ export type Attribution = 'exact' | 'reaction-window' | 'unattributed';
 
 export interface Observation {
   observedAt: number;
-  cycleIndex: number | null;
+  trialIndex: number | null;
   attribution: Attribution;
 }
 
 export interface RunSummary {
   configurationId: string;
-  cycleCount: number;
+  trialCount: number;
   blankFrameCount: number;
-  blankCycles: number[];
+  blankTrials: number[];
   unattributedCount: number;
   observations: Observation[];
 }
@@ -48,19 +52,16 @@ export interface RunSummary {
 export const CONFIGURATIONS: readonly ExperimentConfiguration[] = [
   {
     id: 'cheap-only',
-    description: 'both expensive options off; forced repaint and background colour kept',
     paintWhenInitiallyHidden: false,
     backgroundThrottling: true,
   },
   {
     id: 'no-paint-when-hidden',
-    description: 'compositing while hidden off, background throttling still disabled',
     paintWhenInitiallyHidden: false,
     backgroundThrottling: false,
   },
   {
     id: 'control',
-    description: 'shipped configuration',
     paintWhenInitiallyHidden: true,
     backgroundThrottling: false,
   },
@@ -82,31 +83,37 @@ function shippedConfiguration(): ExperimentConfiguration {
   return shipped;
 }
 
-/**
- * Returns null for an unrecognised id so a typo can be reported rather than
- * silently measuring the shipped configuration under another name.
- */
+export interface ConfigurationSelection {
+  configuration: ExperimentConfiguration;
+  /** False when an id was given but matched nothing, so a typo can be reported
+   * rather than silently measuring the shipped configuration under another name. */
+  recognised: boolean;
+}
+
 export function readConfiguration(
   environment: Record<string, string | undefined>,
-): ExperimentConfiguration | null {
+): ConfigurationSelection {
   const requested = environment.WHATS_EXPERIMENT_CONFIG;
   if (requested === undefined || requested === '') {
-    return shippedConfiguration();
+    return { configuration: shippedConfiguration(), recognised: true };
   }
-  return CONFIGURATIONS.find((configuration) => configuration.id === requested) ?? null;
+  const match = CONFIGURATIONS.find((configuration) => configuration.id === requested);
+  return match
+    ? { configuration: match, recognised: true }
+    : { configuration: shippedConfiguration(), recognised: false };
 }
 
 export function resolveWindowOptions(
   environment: Record<string, string | undefined>,
-): WindowOptions {
-  const configuration = readConfiguration(environment) ?? shippedConfiguration();
+): ExperimentWindowOptions {
+  const { configuration } = readConfiguration(environment);
   return {
     paintWhenInitiallyHidden: configuration.paintWhenInitiallyHidden,
     backgroundThrottling: configuration.backgroundThrottling,
   };
 }
 
-export function parseCycleCount(raw: string | undefined): number {
+export function parseTrialIndex(raw: string | undefined): number {
   if (raw === undefined) {
     return 0;
   }
@@ -117,49 +124,53 @@ export function parseCycleCount(raw: string | undefined): number {
   return count > 0 ? count : 0;
 }
 
-export function attributeObservations(cycles: Cycle[], observedAt: number[]): Observation[] {
+export function attributeObservations(trials: Trial[], observedAt: number[]): Observation[] {
   return observedAt.map((timestamp) => {
-    const visible = cycles.find(
-      (cycle) => timestamp >= cycle.shownAt && timestamp <= cycle.hiddenAt,
+    const visible = trials.find(
+      (trial) => timestamp >= trial.shownAt && timestamp <= trial.hiddenAt,
     );
     if (visible) {
-      return { observedAt: timestamp, cycleIndex: visible.index, attribution: 'exact' as const };
+      return { observedAt: timestamp, trialIndex: visible.index, attribution: 'exact' as const };
     }
 
-    const justHidden = cycles.find(
-      (cycle) => timestamp > cycle.hiddenAt && timestamp - cycle.hiddenAt <= REACTION_WINDOW_MS,
-    );
+    // The nearest preceding trial, not the first match: trials come from
+    // separate app launches, so their windows are not guaranteed ordered.
+    const justHidden = trials
+      .filter(
+        (trial) => timestamp > trial.hiddenAt && timestamp - trial.hiddenAt <= REACTION_WINDOW_MS,
+      )
+      .sort((a, b) => b.hiddenAt - a.hiddenAt)[0];
     if (justHidden) {
       return {
         observedAt: timestamp,
-        cycleIndex: justHidden.index,
+        trialIndex: justHidden.index,
         attribution: 'reaction-window' as const,
       };
     }
 
-    return { observedAt: timestamp, cycleIndex: null, attribution: 'unattributed' as const };
+    return { observedAt: timestamp, trialIndex: null, attribution: 'unattributed' as const };
   });
 }
 
 export function summarizeRun(
   configurationId: string,
-  cycles: Cycle[],
+  trials: Trial[],
   observedAt: number[],
 ): RunSummary {
-  const observations = attributeObservations(cycles, observedAt);
-  const blankCycles = [
+  const observations = attributeObservations(trials, observedAt);
+  const blankTrials = [
     ...new Set(
       observations
-        .map((observation) => observation.cycleIndex)
+        .map((observation) => observation.trialIndex)
         .filter((index): index is number => index !== null),
     ),
   ].sort((a, b) => a - b);
 
   return {
     configurationId,
-    cycleCount: cycles.length,
-    blankFrameCount: blankCycles.length,
-    blankCycles,
+    trialCount: trials.length,
+    blankFrameCount: blankTrials.length,
+    blankTrials,
     unattributedCount: observations.filter(
       (observation) => observation.attribution === 'unattributed',
     ).length,

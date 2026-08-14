@@ -3,10 +3,10 @@ import {
   CONFIGURATIONS,
   readConfiguration,
   resolveWindowOptions,
-  parseCycleCount,
+  parseTrialIndex,
   attributeObservations,
   summarizeRun,
-  type Cycle,
+  type Trial,
 } from '../src/main/blankFrameExperiment';
 
 describe('CONFIGURATIONS', () => {
@@ -43,19 +43,27 @@ describe('CONFIGURATIONS', () => {
 
 describe('readConfiguration', () => {
   it('defaults to the shipped configuration when no override is set', () => {
-    expect(readConfiguration({})).toEqual(
-      CONFIGURATIONS.find((configuration) => configuration.id === 'control'),
-    );
+    const selection = readConfiguration({});
+    expect(selection.configuration.id).toBe('control');
+    expect(selection.recognised).toBe(true);
   });
 
   it('selects a configuration by id', () => {
-    expect(readConfiguration({ WHATS_EXPERIMENT_CONFIG: 'cheap-only' })?.id).toBe('cheap-only');
+    const selection = readConfiguration({ WHATS_EXPERIMENT_CONFIG: 'cheap-only' });
+    expect(selection.configuration.id).toBe('cheap-only');
+    expect(selection.recognised).toBe(true);
   });
 
-  // A typo in the variable must not silently measure the control and get
-  // written up as a passing cheap configuration.
-  it('returns null for an unknown id', () => {
-    expect(readConfiguration({ WHATS_EXPERIMENT_CONFIG: 'chepa-only' })).toBeNull();
+  // A typo must be reportable, not silently measured as the control and written
+  // up as a passing cheap configuration.
+  it('reports an unknown id as unrecognised while falling back to the shipped values', () => {
+    const selection = readConfiguration({ WHATS_EXPERIMENT_CONFIG: 'chepa-only' });
+    expect(selection.recognised).toBe(false);
+    expect(selection.configuration.id).toBe('control');
+  });
+
+  it('treats an empty value as no override', () => {
+    expect(readConfiguration({ WHATS_EXPERIMENT_CONFIG: '' }).recognised).toBe(true);
   });
 });
 
@@ -82,96 +90,102 @@ describe('resolveWindowOptions', () => {
   });
 });
 
-describe('parseCycleCount', () => {
-  it('reports no cycles when the variable is absent, so a normal run is untouched', () => {
-    expect(parseCycleCount(undefined)).toBe(0);
+describe('parseTrialIndex', () => {
+  it('reports no trial when the variable is absent, so a normal run is untouched', () => {
+    expect(parseTrialIndex(undefined)).toBe(0);
   });
 
-  it('reads a positive count', () => {
-    expect(parseCycleCount('30')).toBe(30);
+  it('reads a positive index', () => {
+    expect(parseTrialIndex('7')).toBe(7);
   });
 
   it('rejects values that are not positive integers', () => {
-    expect(parseCycleCount('0')).toBe(0);
-    expect(parseCycleCount('-5')).toBe(0);
-    expect(parseCycleCount('abc')).toBe(0);
-    expect(parseCycleCount('2.5')).toBe(0);
+    expect(parseTrialIndex('0')).toBe(0);
+    expect(parseTrialIndex('-5')).toBe(0);
+    expect(parseTrialIndex('abc')).toBe(0);
+    expect(parseTrialIndex('2.5')).toBe(0);
   });
 });
 
 describe('attributeObservations', () => {
-  const cycles: Cycle[] = [
+  const trials: Trial[] = [
     { index: 1, shownAt: 1000, hiddenAt: 3000 },
     { index: 2, shownAt: 5000, hiddenAt: 7000 },
     { index: 3, shownAt: 9000, hiddenAt: 11000 },
   ];
 
-  it('attributes a keypress to the cycle that was on screen at the time', () => {
-    expect(attributeObservations(cycles, [6000])).toEqual([
-      { observedAt: 6000, cycleIndex: 2, attribution: 'exact' },
+  it('attributes a keypress to the trial that was on screen at the time', () => {
+    expect(attributeObservations(trials, [6000])).toEqual([
+      { observedAt: 6000, trialIndex: 2, attribution: 'exact' },
     ]);
   });
 
   // Reaction time means a keypress can land just after the window is hidden;
-  // blaming the next cycle instead of the one just seen would be wrong.
-  it('attributes a keypress shortly after a cycle ends to that cycle', () => {
-    expect(attributeObservations(cycles, [7300])).toEqual([
-      { observedAt: 7300, cycleIndex: 2, attribution: 'reaction-window' },
+  // blaming the next trial instead of the one just seen would be wrong.
+  it('attributes a keypress shortly after a trial ends to that trial', () => {
+    expect(attributeObservations(trials, [7300])).toEqual([
+      { observedAt: 7300, trialIndex: 2, attribution: 'reaction-window' },
     ]);
   });
 
-  it('prefers the visible cycle over the previous one when both could match', () => {
-    expect(attributeObservations(cycles, [9100])).toEqual([
-      { observedAt: 9100, cycleIndex: 3, attribution: 'exact' },
+  it('prefers the visible trial over the previous one when both could match', () => {
+    expect(attributeObservations(trials, [9100])).toEqual([
+      { observedAt: 9100, trialIndex: 3, attribution: 'exact' },
+    ]);
+  });
+
+  // Trials come from separate app launches, so the log is not guaranteed to be
+  // ordered; the nearest preceding trial must win, not the first one listed.
+  it('picks the nearest preceding trial when the log is out of order', () => {
+    const unordered: Trial[] = [
+      { index: 1, shownAt: 5000, hiddenAt: 7000 },
+      { index: 2, shownAt: 1000, hiddenAt: 3000 },
+    ];
+    expect(attributeObservations(unordered, [7200])).toEqual([
+      { observedAt: 7200, trialIndex: 1, attribution: 'reaction-window' },
     ]);
   });
 
   it('marks a keypress it cannot attribute rather than dropping it', () => {
-    expect(attributeObservations(cycles, [20000])).toEqual([
-      { observedAt: 20000, cycleIndex: null, attribution: 'unattributed' },
+    expect(attributeObservations(trials, [20000])).toEqual([
+      { observedAt: 20000, trialIndex: null, attribution: 'unattributed' },
     ]);
   });
 
-  it('counts repeated presses within one cycle once', () => {
-    const observations = attributeObservations(cycles, [5500, 5600, 6000]);
-    expect(observations).toHaveLength(3);
-    expect(new Set(observations.map((observation) => observation.cycleIndex))).toEqual(new Set([2]));
-  });
-
   it('handles a run with no observations', () => {
-    expect(attributeObservations(cycles, [])).toEqual([]);
+    expect(attributeObservations(trials, [])).toEqual([]);
   });
 });
 
 describe('summarizeRun', () => {
-  const cycles: Cycle[] = [
+  const trials: Trial[] = [
     { index: 1, shownAt: 1000, hiddenAt: 3000 },
     { index: 2, shownAt: 5000, hiddenAt: 7000 },
     { index: 3, shownAt: 9000, hiddenAt: 11000 },
   ];
 
   it('reports zero blank frames for a clean run', () => {
-    const summary = summarizeRun('cheap-only', cycles, []);
+    const summary = summarizeRun('cheap-only', trials, []);
     expect(summary.blankFrameCount).toBe(0);
-    expect(summary.blankCycles).toEqual([]);
-    expect(summary.cycleCount).toBe(3);
+    expect(summary.blankTrials).toEqual([]);
+    expect(summary.trialCount).toBe(3);
   });
 
-  it('counts distinct blank cycles rather than keypresses', () => {
-    const summary = summarizeRun('cheap-only', cycles, [5500, 5600]);
+  it('counts distinct blank trials rather than keypresses', () => {
+    const summary = summarizeRun('cheap-only', trials, [5500, 5600]);
     expect(summary.blankFrameCount).toBe(1);
-    expect(summary.blankCycles).toEqual([2]);
+    expect(summary.blankTrials).toEqual([2]);
   });
 
-  it('lists blank cycles in order', () => {
-    const summary = summarizeRun('control', cycles, [9500, 1500]);
-    expect(summary.blankCycles).toEqual([1, 3]);
+  it('lists blank trials in order', () => {
+    const summary = summarizeRun('control', trials, [9500, 1500]);
+    expect(summary.blankTrials).toEqual([1, 3]);
   });
 
   // An unattributed press means the record is incomplete; a run reported as
   // clean while a press could not be placed would overstate the result.
   it('surfaces unattributed observations separately', () => {
-    const summary = summarizeRun('control', cycles, [20000]);
+    const summary = summarizeRun('control', trials, [20000]);
     expect(summary.blankFrameCount).toBe(0);
     expect(summary.unattributedCount).toBe(1);
   });
