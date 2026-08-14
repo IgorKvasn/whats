@@ -10,13 +10,10 @@
 // window that has never been shown. Trials from many launches are collected
 // into one run and summarized here.
 
-export interface ExperimentConfiguration {
-  id: string;
-  paintWhenInitiallyHidden: boolean;
-  backgroundThrottling: boolean;
-}
+export type ConfigurationId = 'cheap-only' | 'no-paint-when-hidden' | 'control';
 
-export interface ExperimentWindowOptions {
+export interface ExperimentConfiguration {
+  id: ConfigurationId;
   paintWhenInitiallyHidden: boolean;
   backgroundThrottling: boolean;
 }
@@ -28,22 +25,11 @@ export interface Trial {
   hiddenAt: number;
 }
 
-export type Attribution = 'reported';
-
-export interface Observation {
-  /** Always null: trials are reported by number after the run, not timestamped
-   * live. Kept so the record states how the frame was judged. */
-  observedAt: number | null;
-  trialIndex: number;
-  attribution: Attribution;
-}
-
 export interface RunSummary {
   configurationId: string;
   trialCount: number;
   blankFrameCount: number;
   blankTrials: number[];
-  observations: Observation[];
 }
 
 // `paintWhenInitiallyHidden` defaults to true in Electron, so the shipped
@@ -100,16 +86,6 @@ export function readConfiguration(
     : { configuration: shippedConfiguration(), recognised: false };
 }
 
-export function resolveWindowOptions(
-  environment: Record<string, string | undefined>,
-): ExperimentWindowOptions {
-  const { configuration } = readConfiguration(environment);
-  return {
-    paintWhenInitiallyHidden: configuration.paintWhenInitiallyHidden,
-    backgroundThrottling: configuration.backgroundThrottling,
-  };
-}
-
 export function parseTrialIndex(raw: string | undefined): number {
   if (raw === undefined) {
     return 0;
@@ -156,10 +132,5 @@ export function summarizeReportedTrials(
     trialCount: trials.length,
     blankFrameCount: unique.length,
     blankTrials: unique,
-    observations: unique.map((trialIndex) => ({
-      observedAt: null,
-      trialIndex,
-      attribution: 'reported' as const,
-    })),
   };
 }

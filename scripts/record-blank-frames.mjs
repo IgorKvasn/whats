@@ -2,10 +2,9 @@
 // Records which trials showed a blank frame, given their numbers after a
 // configuration has finished running (issue #43).
 //
-// Simpler alternative to observe-blank-frames.mjs: no live terminal session is
-// needed during the run, so the observer just watches the screen and notes the
-// trial numbers the run script prints. Pass them with --blank, or omit it to be
-// prompted.
+// No live terminal session is needed during the run: the observer watches the
+// screen and notes the trial numbers the run script prints, then passes them
+// here with --blank, or omits it to be prompted.
 //
 // Usage:
 //   npm run record-blank-frames -- --log <trials.jsonl> --out <summary.json> --blank "4 17 23"

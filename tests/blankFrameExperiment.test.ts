@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   CONFIGURATIONS,
   readConfiguration,
-  resolveWindowOptions,
   parseTrialIndex,
   parseReportedTrials,
   summarizeReportedTrials,
@@ -67,23 +66,33 @@ describe('readConfiguration', () => {
   });
 });
 
-describe('resolveWindowOptions', () => {
+// These are the values that reach the BrowserWindow, so they guard the promise
+// that a normal launch is untouched by the experiment.
+describe('window options from the selected configuration', () => {
+  const windowOptions = (environment: Record<string, string | undefined>) => {
+    const { configuration } = readConfiguration(environment);
+    return {
+      paintWhenInitiallyHidden: configuration.paintWhenInitiallyHidden,
+      backgroundThrottling: configuration.backgroundThrottling,
+    };
+  };
+
   it('leaves a normal run on the shipped values', () => {
-    expect(resolveWindowOptions({})).toEqual({
+    expect(windowOptions({})).toEqual({
       paintWhenInitiallyHidden: true,
       backgroundThrottling: false,
     });
   });
 
   it('applies the selected configuration', () => {
-    expect(resolveWindowOptions({ WHATS_EXPERIMENT_CONFIG: 'cheap-only' })).toEqual({
+    expect(windowOptions({ WHATS_EXPERIMENT_CONFIG: 'cheap-only' })).toEqual({
       paintWhenInitiallyHidden: false,
       backgroundThrottling: true,
     });
   });
 
   it('falls back to the shipped values for an unknown id', () => {
-    expect(resolveWindowOptions({ WHATS_EXPERIMENT_CONFIG: 'nonsense' })).toEqual({
+    expect(windowOptions({ WHATS_EXPERIMENT_CONFIG: 'nonsense' })).toEqual({
       paintWhenInitiallyHidden: true,
       backgroundThrottling: false,
     });
@@ -156,9 +165,9 @@ describe('summarizeReportedTrials', () => {
     expect(summary.blankTrials).toEqual([1, 3]);
   });
 
-  it('carries the observation source so the record says how frames were judged', () => {
-    expect(summarizeReportedTrials('control', trials, [2]).observations).toEqual([
-      { observedAt: null, trialIndex: 2, attribution: 'reported' },
-    ]);
+  it('de-duplicates and sorts the reported trials', () => {
+    const summary = summarizeReportedTrials('control', trials, [3, 1, 3]);
+    expect(summary.blankTrials).toEqual([1, 3]);
+    expect(summary.blankFrameCount).toBe(2);
   });
 });

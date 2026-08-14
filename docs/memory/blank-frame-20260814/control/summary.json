@@ -2,6 +2,5 @@
   "configurationId": "control",
   "trialCount": 30,
   "blankFrameCount": 0,
-  "blankTrials": [],
-  "observations": []
+  "blankTrials": []
 }

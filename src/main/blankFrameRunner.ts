@@ -18,21 +18,20 @@ export interface TrialOptions {
   trialIndex: number;
   configurationId: string;
   logPath: string;
-  // How long the window stays visible: long enough for the observer to judge
-  // the frame, and long enough for a slow repaint to resolve itself.
-  dwellMs?: number;
 }
 
-const DEFAULT_DWELL_MS = 2500;
+// Long enough for the observer to judge the frame, and for a slow repaint to
+// resolve itself rather than being counted as a permanent blank.
+const DWELL_MS = 2500;
 
 function record(logPath: string, entry: unknown): void {
   appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf-8');
 }
 
 /**
- * Timings use Date.now() rather than a monotonic clock because the observer's
- * keypresses are timestamped by a separate process, and wall clock is the only
- * shared reference between the two.
+ * Timings use Date.now() rather than a monotonic clock so they can be correlated
+ * with the run script's output and the memory captures, which come from other
+ * processes; wall clock is the only shared reference.
  *
  * `show` must be the app's real show path so the trial exercises what a user
  * triggers, including the always-on-top raise that path performs on Wayland.
@@ -42,15 +41,13 @@ export async function runTrial(
   show: () => void,
   options: TrialOptions,
 ): Promise<void> {
-  const dwellMs = options.dwellMs ?? DEFAULT_DWELL_MS;
-
   if (window.isDestroyed()) {
     return;
   }
 
   const shownAt = Date.now();
   show();
-  await delay(dwellMs);
+  await delay(DWELL_MS);
   const hiddenAt = Date.now();
 
   record(options.logPath, {
