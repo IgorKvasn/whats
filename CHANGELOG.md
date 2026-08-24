@@ -1,5 +1,58 @@
 # Changelog
 
+## v1.17.0 — 2026-08-24
+
+### Features
+
+- prompt to open or reveal completed downloads
+- add memory measurement harness and record startup baseline
+
+### Bug Fixes
+
+- stop a surviving instance from voiding the next run's trial 1
+- capture memory in its own launch rather than inside a trial
+- print each trial number live, at the moment the window appears
+- wait on the launched pid so every blank-frame trial actually runs
+- measure the blank window on first show, one trial per launch
+
+### Refactor
+
+- remove the #43 experiment hook from the shipped app
+- stop passing paintWhenInitiallyHidden on a normal launch
+- drop dead scaffolding left by the keypress design
+- shorten the trial settle delay to 5s
+- record blank trials by number instead of live keypresses
+
+### Documentation
+
+- state the repeat-show gap and attribute the memory to renderers
+- report the blank-frame isolation as an undetermined result
+
+### Tests
+
+- add harness to isolate the required parts of the blank-window fix
+
+### Build
+
+- bump @homebridge/dbus-native in the production-minor-patch group (#51)
+
+### CI
+
+- bump github/codeql-action in the github-actions group (#52)
+- bump github/codeql-action in the github-actions group (#49)
+
+### Chores
+
+- bump the dev-dependencies group with 3 updates (#50)
+- bump the dev-dependencies group with 3 updates (#47)
+- bump jsdom from 29.1.1 to 30.0.1 (#48)
+- v1.17.0
+
+### Other
+
+- roll back to v1.16.2
+
+
 ## v1.16.2 — 2026-08-11
 
 ### Bug Fixes
