@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.17.2 — 2026-08-24
+
+### Bug Fixes
+
+- hide menu bar and enlarge download complete dialog
+
+
 ## v1.17.1 — 2026-08-24
 
 ### Bug Fixes
