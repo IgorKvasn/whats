@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.17.1 — 2026-08-24
+
+### Bug Fixes
+
+- pin electron to 43.2.0 to restore the linux tray icon
+- resize tray icons from 512x512 to 32x32
+
+
 ## v1.17.0 — 2026-08-24
 
 ### Features
