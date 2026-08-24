@@ -10,6 +10,16 @@ updates:
     commit-message:
       prefix: build
       prefix-development: chore
+    ignore:
+      # Electron >= 43.3.0 breaks the Linux tray icon: Chromium's
+      # StatusIconLinuxDbus multiplexer routes SNI property reads by well-known
+      # bus name only, so hosts that resolve it to the unique connection name
+      # (GNOME appindicator, xapp-sn-watcher, Xfce panel) fail every
+      # Properties.Get and drop the icon. No released version is fixed yet.
+      # Unpin once electron/electron#53101 ships. Tracking: electron/electron#52674
+      - dependency-name: electron
+        versions:
+          - "> 43.2.0"
     groups:
       dev-dependencies:
         dependency-type: development
