@@ -95,7 +95,7 @@ function DownloadPromptView({ id }: { id: string }) {
   return (
     <div className="dialog download-prompt">
       <h1>Download complete</h1>
-      <p className="download-filename">{info.filename}</p>
+      <p className="download-filename" title={info.filename}>{info.filename}</p>
       {error && <p className="err">{error}</p>}
       <label className="row">
         <input

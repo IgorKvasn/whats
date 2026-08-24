@@ -51,10 +51,10 @@ export class DownloadPromptQueue {
   private openWindow(info: DownloadPromptInfo): void {
     const win = openChildWindow({
       title: 'WhatsApp — Download complete',
-      width: 420,
-      height: 220,
+      width: 440,
+      height: 280,
       minWidth: 360,
-      minHeight: 200,
+      minHeight: 280,
       preloadPath: this.preloadPath,
       url: buildViewUrl(this.rendererUrl, `view=download-prompt&id=${info.id}`),
     });

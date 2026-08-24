@@ -132,6 +132,12 @@ button:disabled {
   word-break: break-all;
   margin-bottom: 16px;
   color: #555;
+  /* Clamped so the fixed dialog height never needs a scrollbar; the full
+     name stays available via the element's title attribute. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .hint {

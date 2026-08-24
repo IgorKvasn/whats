@@ -89,12 +89,19 @@ export function openChildWindow(options: {
     minWidth: options.minWidth,
     minHeight: options.minHeight,
     resizable: true,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: options.preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+  // Child dialogs must not inherit the application menu (File/Edit/View...).
+  // The menu bar is per-window only on Linux/Windows; on macOS it is global.
+  if (process.platform !== 'darwin') {
+    win.setMenuBarVisibility(false);
+    win.removeMenu();
+  }
   win.loadURL(options.url);
   return win;
 }
