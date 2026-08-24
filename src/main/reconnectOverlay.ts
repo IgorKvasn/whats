@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import type { ReloadStatus } from './reload';
+import { buildViewUrl } from './windows';
 
 interface OverlayOptions {
   parent: BrowserWindow;
@@ -74,8 +75,7 @@ export class ReconnectOverlay {
     this.attachBoundsListeners();
     this.syncBounds();
 
-    const separator = this.rendererUrl.includes('?') ? '&' : '?';
-    overlay.loadURL(`${this.rendererUrl}${separator}view=reconnect`);
+    overlay.loadURL(buildViewUrl(this.rendererUrl, 'view=reconnect'));
     overlay.show();
   }
 

@@ -15,16 +15,105 @@ import {
   type ManualCheckResult,
   type UpdateInfo,
 } from './updateApi';
+import {
+  dismissDownload,
+  getDownloadPromptInfo,
+  openDownload,
+  revealDownload,
+  type DownloadPromptInfo,
+} from './downloadPromptApi';
 import type { ReconnectStatus } from './electron';
 import './styles.css';
 
 const viewParam = new URLSearchParams(window.location.search).get('view');
+const downloadPromptId = new URLSearchParams(window.location.search).get('id');
 
 export default function App() {
   if (viewParam === 'about') return <AboutView />;
   if (viewParam === 'update') return <UpdateView />;
   if (viewParam === 'reconnect') return <ReconnectView />;
+  if (viewParam === 'download-prompt' && downloadPromptId) {
+    return <DownloadPromptView id={downloadPromptId} />;
+  }
   return <SettingsView />;
+}
+
+function DownloadPromptView({ id }: { id: string }) {
+  const [info, setInfo] = useState<DownloadPromptInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+
+  useEffect(() => {
+    getDownloadPromptInfo(id).then(setInfo).catch((e) => setError(String(e)));
+  }, [id]);
+
+  async function persistDontAskAgain() {
+    if (!dontAskAgain) return;
+    try {
+      const settings = await getSettings();
+      await setSettings({ ...settings, downloadPromptEnabled: false });
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function handleOpen() {
+    try {
+      await persistDontAskAgain();
+      await openDownload(id);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function handleReveal() {
+    try {
+      await persistDontAskAgain();
+      await revealDownload(id);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function handleDismiss() {
+    try {
+      await persistDontAskAgain();
+      await dismissDownload(id);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  if (!info) {
+    return (
+      <div className="dialog download-prompt">
+        <p>{error ? `Error: ${error}` : 'Loading…'}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dialog download-prompt">
+      <h1>Download complete</h1>
+      <p className="download-filename">{info.filename}</p>
+      {error && <p className="err">{error}</p>}
+      <label className="row">
+        <input
+          type="checkbox"
+          checked={dontAskAgain}
+          onChange={(e) => setDontAskAgain(e.target.checked)}
+        />
+        <span>Don't ask again</span>
+      </label>
+      <div className="row buttons">
+        <button type="button" onClick={handleDismiss}>Dismiss</button>
+        <button type="button" onClick={handleReveal}>Reveal</button>
+        {info.canOpen && (
+          <button type="button" autoFocus onClick={handleOpen}>Open</button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ReconnectView() {
@@ -181,6 +270,16 @@ function SettingsView() {
           <span className="err">Update check failed. Please try again later.</span>
         </div>
       )}
+      <hr />
+      <h2>Downloads</h2>
+      <label className="row">
+        <input
+          type="checkbox"
+          checked={settings.downloadPromptEnabled}
+          onChange={(e) => update({ downloadPromptEnabled: e.target.checked })}
+        />
+        <span>Ask what to do when a download finishes</span>
+      </label>
       <hr />
       <h2>Performance</h2>
       <label className="row">

@@ -10,7 +10,15 @@ export interface Settings {
   autoUpdateCheckEnabled: boolean;
   hardwareAccelerationEnabled: boolean;
   startMinimizedToTray: boolean;
+  downloadPromptEnabled: boolean;
   updateState: unknown;
+}
+
+export interface DownloadPromptInfo {
+  id: string;
+  filename: string;
+  filePath: string;
+  canOpen: boolean;
 }
 
 export interface UpdateInfo {
@@ -40,6 +48,10 @@ interface ElectronAPI {
   closeWindow(): void;
   reconnectNow(): void;
   onReconnectStatus(listener: (status: ReconnectStatus) => void): () => void;
+  getDownloadPromptInfo(id: string): Promise<DownloadPromptInfo | null>;
+  openDownload(id: string): Promise<void>;
+  revealDownload(id: string): Promise<void>;
+  dismissDownload(id: string): Promise<void>;
 }
 
 export type ReconnectStatus = 'waiting' | 'reconnecting' | 'connected';

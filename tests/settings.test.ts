@@ -36,6 +36,7 @@ describe('settings', () => {
       autoUpdateCheckEnabled: true,
       hardwareAccelerationEnabled: false,
       startMinimizedToTray: true,
+      downloadPromptEnabled: false,
       updateState: {
         lastCheckedAt: null,
         skippedVersion: null,
@@ -70,6 +71,7 @@ describe('settings', () => {
   it('defaults have auto-update and hardware acceleration enabled', () => {
     expect(DEFAULT_SETTINGS.autoUpdateCheckEnabled).toBe(true);
     expect(DEFAULT_SETTINGS.hardwareAccelerationEnabled).toBe(true);
+    expect(DEFAULT_SETTINGS.downloadPromptEnabled).toBe(true);
     expect(DEFAULT_SETTINGS.updateState.lastCheckedAt).toBeNull();
     expect(DEFAULT_SETTINGS.updateState.skippedVersion).toBeNull();
     expect(DEFAULT_SETTINGS.updateState.consecutiveFailures).toBe(0);
@@ -92,6 +94,7 @@ describe('settings', () => {
     expect(s.autoUpdateCheckEnabled).toBe(true);
     expect(s.hardwareAccelerationEnabled).toBe(true);
     expect(s.startMinimizedToTray).toBe(false);
+    expect(s.downloadPromptEnabled).toBe(true);
     expect(s.updateState.consecutiveFailures).toBe(0);
   });
 
@@ -104,6 +107,7 @@ describe('settings', () => {
       autoUpdateCheckEnabled: false,
       hardwareAccelerationEnabled: false,
       startMinimizedToTray: true,
+      downloadPromptEnabled: false,
       updateState: {
         lastCheckedAt: 1_700_000_000,
         skippedVersion: 'v0.2.0',

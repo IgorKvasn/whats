@@ -68,15 +68,20 @@ interface DialogOptions {
   rendererUrl: string;
 }
 
-function showDialogWindow(options: DialogOptions): void {
-  const existing = dialogWindows.get(options.label);
-  if (existing && !existing.isDestroyed()) {
-    existing.restore();
-    existing.show();
-    existing.focus();
-    return;
-  }
+export function buildViewUrl(rendererUrl: string, query: string): string {
+  const separator = rendererUrl.includes('?') ? '&' : '?';
+  return `${rendererUrl}${separator}${query}`;
+}
 
+export function openChildWindow(options: {
+  title: string;
+  width: number;
+  height: number;
+  minWidth: number;
+  minHeight: number;
+  preloadPath: string;
+  url: string;
+}): BrowserWindow {
   const win = new BrowserWindow({
     title: options.title,
     width: options.width,
@@ -90,13 +95,31 @@ function showDialogWindow(options: DialogOptions): void {
       nodeIntegration: false,
     },
   });
+  win.loadURL(options.url);
+  return win;
+}
+
+function showDialogWindow(options: DialogOptions): void {
+  const existing = dialogWindows.get(options.label);
+  if (existing && !existing.isDestroyed()) {
+    existing.restore();
+    existing.show();
+    existing.focus();
+    return;
+  }
+
+  const win = openChildWindow({
+    title: options.title,
+    width: options.width,
+    height: options.height,
+    minWidth: options.minWidth,
+    minHeight: options.minHeight,
+    preloadPath: options.preloadPath,
+    url: buildViewUrl(options.rendererUrl, `view=${options.label}`),
+  });
 
   dialogWindows.set(options.label, win);
   win.on('closed', () => dialogWindows.delete(options.label));
-
-  const separator = options.rendererUrl.includes('?') ? '&' : '?';
-  const url = `${options.rendererUrl}${separator}view=${options.label}`;
-  win.loadURL(url);
 }
 
 export function createDialogOpeners(preloadPath: string, rendererUrl: string) {

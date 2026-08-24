@@ -14,6 +14,7 @@ export interface Settings {
   autoUpdateCheckEnabled: boolean;
   hardwareAccelerationEnabled: boolean;
   startMinimizedToTray: boolean;
+  downloadPromptEnabled: boolean;
   updateState: UpdateState;
 }
 
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoUpdateCheckEnabled: true,
   hardwareAccelerationEnabled: true,
   startMinimizedToTray: false,
+  downloadPromptEnabled: true,
   updateState: {
     lastCheckedAt: null,
     skippedVersion: null,
@@ -83,6 +85,10 @@ export function loadSettings(path: string): Settings {
       typeof obj.startMinimizedToTray === 'boolean'
         ? obj.startMinimizedToTray
         : DEFAULT_SETTINGS.startMinimizedToTray,
+    downloadPromptEnabled:
+      typeof obj.downloadPromptEnabled === 'boolean'
+        ? obj.downloadPromptEnabled
+        : DEFAULT_SETTINGS.downloadPromptEnabled,
     updateState: {
       lastCheckedAt:
         typeof updateStateRaw.lastCheckedAt === 'number'

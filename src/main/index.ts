@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, type IpcMainEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, type DownloadItem, type IpcMainEvent } from 'electron';
 import path from 'node:path';
 import { loadSettings, saveSettings, shouldShowOnLaunch, type Settings } from './settings';
 import { currentBuildInfo } from './buildInfo';
@@ -37,10 +37,15 @@ import {
 import { installAutoReload, MAIN_URL, type AutoReloadController } from './reload';
 import { ReconnectOverlay } from './reconnectOverlay';
 import { shouldShowIncomingNotification } from './notificationPolicy';
+import { installDownloadObserver } from './downloads';
+import { notifyDownloadFailed } from './downloadNotifications';
+import { DownloadPromptQueue, registerDownloadPromptIpc } from './downloadPrompts';
+import { isSafeToOpen } from './executableClassifier';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings: Settings = loadSettings(settingsPath);
 let lastNotification: LastNotification | null = null;
+let downloadPrompts: DownloadPromptQueue;
 let currentUpdate: UpdateInfo | null = null;
 let trayHandle: TrayHandle | null = null;
 let dialogs: ReturnType<typeof createDialogOpeners>;
@@ -99,15 +104,28 @@ async function initialize(): Promise<void> {
     mainWindow.show();
   }
 
+  const rendererUrl =
+    process.env.ELECTRON_RENDERER_URL ??
+    `file://${path.join(__dirname, '../renderer/index.html')}`;
+
+  downloadPrompts = new DownloadPromptQueue(preloadDialogPath, rendererUrl);
+  registerDownloadPromptIpc(downloadPrompts);
+
   setMainWindow(mainWindow);
   mainWindow.on('focus', closeAllNotifications);
   installNavigationGuards(mainWindow.webContents, (url) => {
     void shell.openExternal(url);
   });
-
-  const rendererUrl =
-    process.env.ELECTRON_RENDERER_URL ??
-    `file://${path.join(__dirname, '../renderer/index.html')}`;
+  installDownloadObserver(mainWindow.webContents.session, {
+    onOutcome: (item, outcome) => {
+      console.log(`downloads: "${item.getFilename()}" observed as ${outcome}`);
+      if (outcome === 'interrupted') {
+        notifyDownloadFailed(item, settings, notificationIconPath, showMainWindow);
+      } else if (outcome === 'completed') {
+        void handleDownloadCompleted(item);
+      }
+    },
+  });
 
   const reconnectOverlay = new ReconnectOverlay({
     parent: mainWindow,
@@ -352,4 +370,17 @@ function handleFailure(): void {
       showMainWindow,
     );
   }
+}
+
+async function handleDownloadCompleted(item: DownloadItem): Promise<void> {
+  if (!settings.downloadPromptEnabled) return;
+
+  const filePath = item.getSavePath();
+  const canOpen = await isSafeToOpen(filePath);
+
+  downloadPrompts.enqueue({
+    filename: item.getFilename(),
+    filePath,
+    canOpen,
+  });
 }

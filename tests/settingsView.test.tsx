@@ -28,6 +28,7 @@ beforeEach(() => {
     autoUpdateCheckEnabled: true,
     hardwareAccelerationEnabled: true,
     startMinimizedToTray: false,
+    downloadPromptEnabled: true,
     updateState: {},
   });
   mockElectronAPI.setSettings.mockResolvedValue(undefined);
@@ -76,6 +77,56 @@ describe('SettingsView auto-update controls', () => {
       expect(
         screen.getByText(/Update check failed\. Please try again later\./),
       ).toBeTruthy(),
+    );
+  });
+});
+
+describe('SettingsView download prompt toggle', () => {
+  it('renders the download prompt checkbox, checked by default', async () => {
+    const { default: App } = await import('../src/renderer/App');
+    render(<App />);
+    const checkbox = (await waitFor(() =>
+      screen.getByLabelText(/Ask what to do when a download finishes/i),
+    )) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+  });
+
+  it('unchecking it persists downloadPromptEnabled=false', async () => {
+    const { default: App } = await import('../src/renderer/App');
+    render(<App />);
+    const checkbox = await waitFor(() =>
+      screen.getByLabelText(/Ask what to do when a download finishes/i),
+    );
+    fireEvent.click(checkbox);
+    await waitFor(() =>
+      expect(mockElectronAPI.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ downloadPromptEnabled: false }),
+      ),
+    );
+  });
+
+  it('re-checking it after it was turned off persists downloadPromptEnabled=true', async () => {
+    mockElectronAPI.getSettings.mockResolvedValue({
+      notificationsEnabled: true,
+      soundEnabled: true,
+      includePreview: false,
+      autoUpdateCheckEnabled: true,
+      hardwareAccelerationEnabled: true,
+      startMinimizedToTray: false,
+      downloadPromptEnabled: false,
+      updateState: {},
+    });
+    const { default: App } = await import('../src/renderer/App');
+    render(<App />);
+    const checkbox = (await waitFor(() =>
+      screen.getByLabelText(/Ask what to do when a download finishes/i),
+    )) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    fireEvent.click(checkbox);
+    await waitFor(() =>
+      expect(mockElectronAPI.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ downloadPromptEnabled: true }),
+      ),
     );
   });
 });

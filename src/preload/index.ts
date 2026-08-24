@@ -17,4 +17,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('reconnect:status', handler);
     return () => ipcRenderer.removeListener('reconnect:status', handler);
   },
+  getDownloadPromptInfo: (id: string) => ipcRenderer.invoke('download-prompt:get-info', id),
+  openDownload: (id: string) => ipcRenderer.invoke('download-prompt:open', id),
+  revealDownload: (id: string) => ipcRenderer.invoke('download-prompt:reveal', id),
+  dismissDownload: (id: string) => ipcRenderer.invoke('download-prompt:dismiss', id),
 });
