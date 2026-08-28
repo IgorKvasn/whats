@@ -1,11 +1,29 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const SOUND_FILE = '/usr/share/sounds/freedesktop/stereo/message-new-instant.oga';
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
+const MAX_CACHED_ICON_FILES = 128;
+const MAX_CACHED_ICON_BYTES = 32 * 1024 * 1024;
+const ICON_FETCH_TIMEOUT_MS = 1500;
+
+// The notification payload (icon URL included) is authored by the untrusted
+// WhatsApp page, so the main process only fetches hosts the page legitimately
+// serves avatars from. Anything else — most importantly loopback, link-local
+// and RFC1918 addresses reachable only from the user's machine — is refused.
+export const ALLOWED_ICON_HOSTS = [
+  'web.whatsapp.com',
+  'pps.whatsapp.net',
+  'media.whatsapp.net',
+] as const;
+
+export const ALLOWED_ICON_HOST_SUFFIXES = [
+  '.cdn.whatsapp.net',
+  '.fbcdn.net',
+] as const;
 
 const DBUS_DEST = 'org.freedesktop.Notifications';
 const DBUS_PATH = '/org/freedesktop/Notifications';
@@ -88,11 +106,10 @@ interface ActiveNotification {
   cleanupIcon?: () => void | Promise<void>;
 }
 
-const activeNotificationIds = new Set<number>();
 const activeNotifications = new Map<number, ActiveNotification>();
-let cachedInterface: NotificationsInterface | null = null;
 
 let dbusModulePromise: Promise<DbusNativeModule> | null = null;
+let interfacePromise: Promise<NotificationsInterface> | null = null;
 
 function loadDbus(): Promise<DbusNativeModule> {
   // The package's shipped types only declare systemBus(), but the runtime also
@@ -109,11 +126,18 @@ function getSessionBus(dbusModule: DbusNativeModule): DbusMessageBus {
   return dbus.sessionBus();
 }
 
-function getNotificationsInterface(dbusModule: DbusNativeModule): Promise<NotificationsInterface> {
+function connectNotificationsInterface(
+  dbusModule: DbusNativeModule,
+): Promise<NotificationsInterface> {
   return new Promise((resolve, reject) => {
     const bus = getSessionBus(dbusModule);
     let settled = false;
     const onConnectionError = (error: Error): void => {
+      // A dropped connection invalidates every notification id the server
+      // handed out on it, so discard the bookkeeping (which also runs each
+      // pending icon cleanup exactly once) and reconnect on the next call.
+      abandonActiveNotifications();
+      dropCachedInterface();
       if (settled) return;
       settled = true;
       reject(error);
@@ -123,18 +147,41 @@ function getNotificationsInterface(dbusModule: DbusNativeModule): Promise<Notifi
     bus.getService(DBUS_DEST).getInterface(DBUS_PATH, DBUS_DEST, (error, iface) => {
       if (settled) return;
       settled = true;
-      bus.connection.removeListener('error', onConnectionError);
       if (error) {
+        bus.connection.removeListener('error', onConnectionError);
+        dropCachedInterface();
         reject(error);
         return;
       }
       if (!iface) {
+        bus.connection.removeListener('error', onConnectionError);
+        dropCachedInterface();
         reject(new Error('D-Bus notifications interface is unavailable'));
         return;
       }
       resolve(iface);
     });
   });
+}
+
+function getNotificationsInterface(): Promise<NotificationsInterface> {
+  interfacePromise ??= loadDbus()
+    .then((dbusModule) => connectNotificationsInterface(dbusModule))
+    .catch((error: unknown) => {
+      interfacePromise = null;
+      throw error;
+    });
+  return interfacePromise;
+}
+
+function dropCachedInterface(): void {
+  interfacePromise = null;
+}
+
+function abandonActiveNotifications(): void {
+  for (const id of [...activeNotifications.keys()]) {
+    finalizeNotification(id);
+  }
 }
 
 function notify(
@@ -195,14 +242,10 @@ export function showNotification(
 ): void {
   const displayIconPath = senderIconPath || iconPath;
 
-  loadDbus()
-    .then((dbusModule) => getNotificationsInterface(dbusModule))
+  getNotificationsInterface()
     .then((iface) => {
-      cachedInterface = iface;
-
       return notify(iface, sender, body, iconPath, senderIconPath)
         .then((notificationId) => {
-          activeNotificationIds.add(notificationId);
           const actionHandler = (id: number, actionKey: string): void => {
             if (id !== notificationId) return;
             finalizeNotification(notificationId);
@@ -237,7 +280,6 @@ export function showNotification(
 }
 
 function finalizeNotification(notificationId: number): void {
-  activeNotificationIds.delete(notificationId);
   const entry = activeNotifications.get(notificationId);
   if (!entry) return;
 
@@ -270,11 +312,18 @@ export async function resolveNotificationIconPath(
     return writeCachedIcon(buffer, cacheDir, `${hash(icon)}.${ext}`);
   }
 
-  if (!/^https:\/\//i.test(icon)) return fallbackIconPath;
+  if (!isAllowedIconUrl(icon)) return fallbackIconPath;
 
   try {
-    const response = await fetch(icon, { signal: AbortSignal.timeout(1500) });
+    // Redirects are refused rather than followed: an allowlisted host could
+    // otherwise 302 the main process to http://169.254.169.254/ or another
+    // host-local address, which would defeat the check above entirely.
+    const response = await fetch(icon, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(ICON_FETCH_TIMEOUT_MS),
+    });
     if (!response.ok) return fallbackIconPath;
+    if (!isAllowedIconUrl(response.url)) return fallbackIconPath;
     const contentLength = Number(response.headers.get('content-length') || '0');
     if (contentLength > MAX_ICON_BYTES) return fallbackIconPath;
     const contentType = response.headers.get('content-type') || '';
@@ -286,6 +335,23 @@ export async function resolveNotificationIconPath(
   } catch {
     return fallbackIconPath;
   }
+}
+
+export function isAllowedIconUrl(candidate: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== 'https:') return false;
+  if (url.username || url.password) return false;
+  if (url.port && url.port !== '443') return false;
+
+  const host = url.hostname.toLowerCase().replace(/\.$/, '');
+  if (ALLOWED_ICON_HOSTS.some((allowed) => host === allowed)) return true;
+  return ALLOWED_ICON_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
 }
 
 function extensionForContentType(contentType: string): string | null {
@@ -300,7 +366,70 @@ async function writeCachedIcon(buffer: Buffer, cacheDir: string, fileName: strin
   await mkdir(cacheDir, { recursive: true });
   const iconPath = path.join(cacheDir, fileName);
   await writeFile(iconPath, buffer);
+  await sweepNotificationIconCache(cacheDir, iconPath);
   return iconPath;
+}
+
+interface CachedIconFile {
+  filePath: string;
+  size: number;
+  modifiedMs: number;
+}
+
+async function listCachedIcons(cacheDir: string): Promise<CachedIconFile[]> {
+  const entries = await readdir(cacheDir, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry): Promise<CachedIconFile | null> => {
+      if (!entry.isFile()) return null;
+      const filePath = path.join(cacheDir, entry.name);
+      try {
+        const stats = await stat(filePath);
+        return { filePath, size: stats.size, modifiedMs: stats.mtimeMs };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return files.filter((file): file is CachedIconFile => file !== null);
+}
+
+/**
+ * Evicts oldest cached icons until the directory is back under the file-count
+ * and total-byte bounds. A hostile page can request an unbounded number of
+ * distinct icons, each written before the notification is dispatched, so the
+ * cache needs a hard cap rather than relying on per-notification cleanup.
+ * Call at startup as well, to reclaim icons orphaned by a crash.
+ */
+export async function sweepNotificationIconCache(
+  cacheDir: string,
+  keepPath?: string,
+): Promise<void> {
+  try {
+    const files = await listCachedIcons(cacheDir);
+    let totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    let fileCount = files.length;
+    if (fileCount <= MAX_CACHED_ICON_FILES && totalBytes <= MAX_CACHED_ICON_BYTES) return;
+
+    const evictable = files
+      .filter((file) => file.filePath !== keepPath)
+      .sort((a, b) => a.modifiedMs - b.modifiedMs || a.filePath.localeCompare(b.filePath));
+
+    for (const file of evictable) {
+      if (fileCount <= MAX_CACHED_ICON_FILES && totalBytes <= MAX_CACHED_ICON_BYTES) return;
+      try {
+        await unlink(file.filePath);
+        fileCount -= 1;
+        totalBytes -= file.size;
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+        fileCount -= 1;
+        totalBytes -= file.size;
+      }
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    console.error('notify: notification icon cache sweep failed:', err);
+  }
 }
 
 function hash(value: string): string {
@@ -318,16 +447,13 @@ export async function removeCachedNotificationIcon(
 }
 
 export function closeAllNotifications(): void {
-  if (!cachedInterface || activeNotificationIds.size === 0) return;
-  const iface = cachedInterface;
-  for (const id of [...activeNotificationIds]) {
-    iface.CloseNotification(id, () => {});
+  for (const [id, entry] of [...activeNotifications]) {
+    entry.iface.CloseNotification(id, () => {});
     finalizeNotification(id);
   }
 }
 
 export function resetNotificationState(): void {
-  activeNotificationIds.clear();
   activeNotifications.clear();
-  cachedInterface = null;
+  dropCachedInterface();
 }
