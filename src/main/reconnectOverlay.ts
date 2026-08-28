@@ -20,7 +20,6 @@ export class ReconnectOverlay {
   private readonly rendererUrl: string;
   private window: BrowserWindow | null = null;
   private lastStatus: ReloadStatus = 'connected';
-  private readonly boundsListeners: Array<() => void> = [];
 
   constructor(options: OverlayOptions) {
     this.parent = options.parent;
@@ -65,14 +64,14 @@ export class ReconnectOverlay {
     });
 
     this.window = overlay;
+    const detachBoundsListeners = this.attachBoundsListeners(overlay);
     overlay.on('closed', () => {
-      this.detachBoundsListeners();
+      detachBoundsListeners();
       if (this.window === overlay) this.window = null;
     });
 
     overlay.webContents.on('did-finish-load', () => this.pushStatus());
 
-    this.attachBoundsListeners();
     this.syncBounds();
 
     overlay.loadURL(buildViewUrl(this.rendererUrl, 'view=reconnect'));
@@ -97,16 +96,21 @@ export class ReconnectOverlay {
     this.window.setBounds(this.parent.getContentBounds());
   }
 
-  private attachBoundsListeners(): void {
-    const sync = () => this.syncBounds();
+  /**
+   * Tracks the parent for one specific overlay window. The returned detach
+   * function is owned by that window alone, so an overlay closing on a later
+   * tick can never strip the listeners of an overlay created in the meantime.
+   */
+  private attachBoundsListeners(overlay: BrowserWindow): () => void {
+    const sync = () => {
+      if (overlay.isDestroyed() || this.parent.isDestroyed()) return;
+      overlay.setBounds(this.parent.getContentBounds());
+    };
     this.parent.on('resize', sync);
     this.parent.on('move', sync);
-    this.boundsListeners.push(() => this.parent.removeListener('resize', sync));
-    this.boundsListeners.push(() => this.parent.removeListener('move', sync));
-  }
-
-  private detachBoundsListeners(): void {
-    for (const remove of this.boundsListeners) remove();
-    this.boundsListeners.length = 0;
+    return () => {
+      this.parent.removeListener('resize', sync);
+      this.parent.removeListener('move', sync);
+    };
   }
 }
