@@ -1,4 +1,5 @@
 import { ipcMain, shell, type BrowserWindow } from 'electron';
+import { isSafeToOpen } from './executableClassifier';
 import { buildViewUrl, openChildWindow } from './windows';
 
 export interface DownloadPromptInfo {
@@ -86,12 +87,15 @@ export class DownloadPromptQueue {
 
   async open(id: string): Promise<void> {
     const info = this.infoById.get(id);
-    this.closePrompt(id);
     if (!info) return;
+    if (!info.canOpen || !(await isSafeToOpen(info.filePath))) {
+      throw new Error(`Refusing to open ${info.filename}: this file type is not safe to open.`);
+    }
     const errorMessage = await shell.openPath(info.filePath);
     if (errorMessage) {
       throw new Error(errorMessage);
     }
+    this.closePrompt(id);
   }
 
   reveal(id: string): void {
