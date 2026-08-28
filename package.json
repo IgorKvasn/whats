@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "ELECTRON_DISABLE_SANDBOX=1 electron-vite dev",
     "build": "electron-vite build",
+    "lint": "eslint .",
     "postinstall": "electron-builder install-app-deps",
     "package": "electron-vite build && electron-builder --linux deb",
     "test": "vitest run",
@@ -34,9 +35,13 @@
     "electron": "43.2.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.11.0",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
-    "typescript": "~7.0.2",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.5",
     "yaml": "^2.8.4"
   },

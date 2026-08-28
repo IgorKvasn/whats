@@ -42,5 +42,11 @@ jobs:
       - name: Type-check renderer
         run: npx tsc -p tsconfig.json --noEmit
 
+      # Reports only until the pre-existing floating-promise violations are cleared;
+      # drop continue-on-error to make this a blocking gate.
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
       - name: Build
         run: npm run build
