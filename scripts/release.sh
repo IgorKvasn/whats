@@ -4,10 +4,14 @@
 # tag, push, and publish a GitHub release with the .deb attached.
 #
 # Usage:
-#   scripts/release.sh --bump <patch|minor|major|X.Y.Z> [flags]
+#   scripts/release.sh [--bump <patch|minor|major|X.Y.Z>] [flags]
+#
+# With no --bump, the level is derived from the Conventional Commit messages
+# since the last v* tag: a breaking change bumps major, a feat bumps minor,
+# anything else bumps patch.
 #
 # Flags:
-#   --bump <level>    Required. patch | minor | major | explicit X.Y.Z
+#   --bump <level>    Override the derived level. patch | minor | major | X.Y.Z
 #   --draft           Create the GitHub release as a draft.
 #   --prerelease      Mark the GitHub release as a prerelease.
 #   --skip-tests      Pass --skip-tests to scripts/build-deb.sh.
@@ -37,7 +41,7 @@ ASSUME_YES=0
 DRY_RUN=0
 TEMP_FILES=()
 
-usage() { sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,26p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 cleanup() {
   if [[ "${#TEMP_FILES[@]}" -gt 0 ]]; then
@@ -109,8 +113,6 @@ cd "${REPO_ROOT}"
 # ------------------------------------------------------------------
 log "Checking preconditions"
 
-[[ -n "${BUMP}" ]] || die "--bump is required (patch|minor|major|X.Y.Z)"
-
 for cmd in git gh node npm dpkg-deb; do
   command -v "${cmd}" >/dev/null 2>&1 || die "missing required tool: ${cmd}"
 done
@@ -127,12 +129,96 @@ fi
 run git fetch "${REMOTE}" --tags --quiet
 
 # ------------------------------------------------------------------
+# Collect commits since the last release tag
+# ------------------------------------------------------------------
+log "Collecting commits since last release"
+
+last_tag="$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)"
+if [[ -n "${last_tag}" ]]; then
+  range="${last_tag}..HEAD"
+  echo "Range: ${range}"
+else
+  range=""
+  echo "Range: full history (no previous v* tag)"
+fi
+
+git_log_args=(git log --no-merges --pretty=format:%s)
+[[ -n "${range}" ]] && git_log_args+=("${range}")
+mapfile -t commits < <("${git_log_args[@]}")
+
+[[ "${#commits[@]}" -gt 0 ]] || die "no commits since ${last_tag:-start of history}; nothing to release"
+
+declare -A groups=(
+  [feat]="Features"
+  [fix]="Bug Fixes"
+  [perf]="Performance"
+  [refactor]="Refactor"
+  [docs]="Documentation"
+  [test]="Tests"
+  [build]="Build"
+  [ci]="CI"
+  [chore]="Chores"
+  [style]="Style"
+)
+order=(feat fix perf refactor docs test build ci chore style)
+
+declare -A bucketed
+declare -a breaking_notes=()
+cc_re='^([a-z]+)(\([^)]*\))?(!)?:[[:space:]]*(.+)$'
+has_breaking=0
+has_feat=0
+for c in "${commits[@]}"; do
+  if [[ "${c}" =~ $cc_re ]]; then
+    type="${BASH_REMATCH[1]}"
+    bang="${BASH_REMATCH[3]}"
+    msg="${BASH_REMATCH[4]}"
+    [[ "${type}" == "feat" ]] && has_feat=1
+    if [[ -n "${bang}" ]]; then
+      has_breaking=1
+      breaking_notes+=("${msg}")
+    fi
+  else
+    type="other"
+    msg="${c}"
+  fi
+  [[ -n "${groups[${type}]:-}" ]] || type="other"
+  bucketed[${type}]+="- ${msg}"$'\n'
+done
+
+# `!` only appears in the subject; a BREAKING CHANGE footer lives in the body.
+body_log_args=(git log --no-merges --pretty=format:%B)
+[[ -n "${range}" ]] && body_log_args+=("${range}")
+while IFS= read -r line; do
+  has_breaking=1
+  breaking_notes+=("${line#*: }")
+done < <("${body_log_args[@]}" | grep -E '^BREAKING[ -]CHANGE:' || true)
+
+# ------------------------------------------------------------------
 # Compute new version
 # ------------------------------------------------------------------
 log "Computing new version"
 
 current_version="$(node -p "require('./package.json').version")"
 echo "Current version: ${current_version}"
+
+if [[ -z "${BUMP}" ]]; then
+  if [[ "${has_breaking}" -eq 1 ]]; then
+    BUMP="major"
+  elif [[ "${has_feat}" -eq 1 ]]; then
+    BUMP="minor"
+  else
+    BUMP="patch"
+  fi
+  # A 0.x project is still unstable: a breaking change bumps minor, not major.
+  if [[ "${BUMP}" == "major" && "${current_version}" == 0.* ]]; then
+    BUMP="minor"
+    echo "Derived bump:    minor (breaking change on a 0.x version)"
+  else
+    echo "Derived bump:    ${BUMP} (from ${#commits[@]} commit(s) since ${last_tag:-start of history})"
+  fi
+else
+  echo "Requested bump:  ${BUMP} (explicit override)"
+fi
 
 if [[ "${BUMP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   new_version="${BUMP}"
@@ -155,51 +241,9 @@ if git rev-parse "${tag}" >/dev/null 2>&1; then
 fi
 
 # ------------------------------------------------------------------
-# Build changelog section from git log since last tag
+# Build changelog section
 # ------------------------------------------------------------------
 log "Generating changelog for ${tag}"
-
-last_tag="$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)"
-if [[ -n "${last_tag}" ]]; then
-  range="${last_tag}..HEAD"
-  echo "Range: ${range}"
-else
-  range=""
-  echo "Range: full history (no previous v* tag)"
-fi
-
-# Collect commits, group by Conventional Commit type.
-git_log_args=(git log --no-merges --pretty=format:%s)
-[[ -n "${range}" ]] && git_log_args+=("${range}")
-mapfile -t commits < <("${git_log_args[@]}")
-
-declare -A groups=(
-  [feat]="Features"
-  [fix]="Bug Fixes"
-  [perf]="Performance"
-  [refactor]="Refactor"
-  [docs]="Documentation"
-  [test]="Tests"
-  [build]="Build"
-  [ci]="CI"
-  [chore]="Chores"
-  [style]="Style"
-)
-order=(feat fix perf refactor docs test build ci chore style)
-
-declare -A bucketed
-cc_re='^([a-z]+)(\([^)]*\))?!?:[[:space:]]*(.+)$'
-for c in "${commits[@]}"; do
-  if [[ "${c}" =~ $cc_re ]]; then
-    type="${BASH_REMATCH[1]}"
-    msg="${BASH_REMATCH[3]}"
-  else
-    type="other"
-    msg="${c}"
-  fi
-  [[ -n "${groups[${type}]:-}" ]] || type="other"
-  bucketed[${type}]+="- ${msg}"$'\n'
-done
 
 today="$(date -u +%Y-%m-%d)"
 section_file="$(mktemp)"
@@ -207,6 +251,12 @@ TEMP_FILES+=("${section_file}")
 {
   printf '## %s — %s\n\n' "${tag}" "${today}"
   any=0
+  if [[ "${#breaking_notes[@]}" -gt 0 ]]; then
+    printf '### BREAKING CHANGES\n\n'
+    printf -- '- %s\n' "${breaking_notes[@]}"
+    printf '\n'
+    any=1
+  fi
   for t in "${order[@]}"; do
     if [[ -n "${bucketed[${t}]:-}" ]]; then
       printf '### %s\n\n%s\n' "${groups[${t}]}" "${bucketed[${t}]}"

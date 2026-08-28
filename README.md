@@ -112,10 +112,20 @@ sudo apt install ./dist/whats_*.deb
 
 ## Releasing
 
-Releases are cut with `scripts/release.sh`. The script bumps
-`package.json`, regenerates `CHANGELOG.md` from Conventional Commit messages,
-builds a `.deb`, commits, tags, pushes, and publishes a GitHub release with the
-package attached.
+Releases are cut with `scripts/release.sh`. The script derives the next version
+from the Conventional Commit messages since the last `v*` tag, bumps
+`package.json`, regenerates `CHANGELOG.md`, builds a `.deb`, commits, tags,
+pushes, and publishes a GitHub release with the package attached.
+
+The version bump follows the commits in the release range:
+
+| Commits since the last tag | Bump |
+| -------------------------- | ----- |
+| A breaking change (`type!:` or a `BREAKING CHANGE:` footer) | major |
+| At least one `feat:` | minor |
+| Anything else (`fix:`, `chore:`, `docs:`, …) | patch |
+
+On a `0.x` version a breaking change bumps the minor instead of the major.
 
 One-time setup:
 
@@ -128,19 +138,19 @@ Release checklist:
 
 1. Land all changes on `main`.
 2. Confirm the working tree is clean.
-3. Preview the release:
+3. Preview the release, and check the version it picked:
 
    ```bash
-   scripts/release.sh --bump patch --dry-run
+   scripts/release.sh --dry-run
    ```
 
 4. Cut the release:
 
    ```bash
-   scripts/release.sh --bump patch
+   scripts/release.sh
    ```
 
-Use `--bump minor`, `--bump major`, or `--bump X.Y.Z` to pick the version. Add
+Pass `--bump patch|minor|major|X.Y.Z` to override the derived version. Add
 `--draft` or `--prerelease` when appropriate, `--skip-tests` to skip the
 test/build step, and `--yes` to skip the confirmation prompt.
 
