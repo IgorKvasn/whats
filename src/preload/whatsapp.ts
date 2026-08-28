@@ -126,6 +126,9 @@ function installNotificationShim(): void {
   webFrame.executeJavaScript(NOTIFICATION_SHIM_SOURCE);
 
   window.addEventListener('message', (event) => {
+    // Only the shim injected into this same window may raise notifications;
+    // without this any embedded frame could forge __whats_notify payloads.
+    if (event.source !== window) return;
     if (event.data?.type === '__whats_notify') {
       lastDirectNotificationAtMs = Date.now();
       safeIpcSend('whatsapp:notify', {

@@ -12,7 +12,14 @@ async function loadPreload(): Promise<{ NOTIFICATION_SHIM_SOURCE: string }> {
   return import('../src/preload/whatsapp');
 }
 
+// jsdom leaves event.source null for postMessage issued from a `new Function` scope, so the
+// shim's messages would be rejected by the preload's same-window guard. Stay patched for the
+// lifetime of the shim and redispatch with source set, matching what a real browser reports
+// for a same-window post.
 function runShim(source: string): void {
+  window.postMessage = ((data: unknown) => {
+    window.dispatchEvent(new MessageEvent('message', { data, source: window }));
+  }) as typeof window.postMessage;
   new Function(source)();
 }
 
@@ -159,6 +166,24 @@ describe('preload message bridge', () => {
 
     window.postMessage({ type: 'something-else', title: 'Alice' }, '*');
     await flushMessages();
+
+    expect(ipcSend).not.toHaveBeenCalledWith('whatsapp:notify', expect.anything());
+  });
+
+  it('ignores __whats_notify messages forged by an embedded frame', async () => {
+    await loadPreload();
+    ipcSend.mockClear();
+
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: '__whats_notify', title: 'Attacker', body: 'forged', icon: null },
+        source: frame.contentWindow,
+      }),
+    );
+    await flushMessages();
+    frame.remove();
 
     expect(ipcSend).not.toHaveBeenCalledWith('whatsapp:notify', expect.anything());
   });

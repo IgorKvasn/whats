@@ -14,6 +14,7 @@ import {
   resolveNotificationIconPath,
   removeCachedNotificationIcon,
   closeAllNotifications,
+  sweepNotificationIconCache,
   isSafeExternalUrl,
 } from './notifications';
 import { createTray, updateTray, type TrayHandle } from './tray';
@@ -49,6 +50,7 @@ import { isSafeToOpen } from './executableClassifier';
 import { createWhatsappIpcHandlers, type NotifyPayload } from './whatsappIpc';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+const notificationIconCacheDir = path.join(app.getPath('userData'), 'notification-icons');
 let settings: Settings = loadSettings(settingsPath);
 let downloadPrompts: DownloadPromptQueue;
 let currentUpdate: UpdateInfo | null = null;
@@ -172,6 +174,9 @@ async function initialize(): Promise<void> {
 
   registerIpcHandlers(iconDir);
 
+  // Reclaims icons orphaned by a crash between writing one and its close callback.
+  void sweepNotificationIconCache(notificationIconCacheDir);
+
   if (settings.autoUpdateCheckEnabled) {
     setTimeout(() => {
       runStartupCheck().catch((err) => {
@@ -244,11 +249,7 @@ function registerIpcHandlers(iconDir: string): void {
     shouldDispatch,
     now: () => Date.now(),
     resolveNotificationIconPath: (icon) =>
-      resolveNotificationIconPath(
-        icon,
-        notificationIconPath,
-        path.join(app.getPath('userData'), 'notification-icons'),
-      ),
+      resolveNotificationIconPath(icon, notificationIconPath, notificationIconCacheDir),
     removeCachedNotificationIcon: (iconPath) => {
       void removeCachedNotificationIcon(iconPath, notificationIconPath);
     },
