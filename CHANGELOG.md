@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.18.0 — 2026-08-28
+
+### Features
+
+- derive version from conventional commits
+
+### Bug Fixes
+
+- reject forged notification messages from embedded frames
+- restrict icon fetches, bound icon cache and reuse the d-bus bus
+- guard subframe navigations with will-frame-navigate
+- re-check file safety in main before opening and surface failures
+- validate settings:set payload and cover the whatsapp ipc trust gate
+- scope overlay bounds listeners to their own window
+
+### Refactor
+
+- drop dead notification code and cover the injected shim
+
+### Build
+
+- add eslint with type-aware rules and pin typescript to 6.x
+
+### Chores
+
+- bump the dev-dependencies group across 1 directory with 2 updates (#59)
+- remove unreferenced debug and mock scratch files
+
+
 ## v1.17.2 — 2026-08-24
 
 ### Bug Fixes
