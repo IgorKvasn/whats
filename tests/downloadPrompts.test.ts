@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // @vitest-environment node
 
-const { mockOpenChildWindow, mockShowItemInFolder, mockOpenPath, windows } = vi.hoisted(() => {
+const { mockOpenChildWindow, mockShowItemInFolder, mockOpenPath, mockIsSafeToOpen, windows } = vi.hoisted(() => {
   const windows: Array<{
     handlers: Map<string, (...args: unknown[]) => void>;
     loadURL: ReturnType<typeof vi.fn>;
@@ -32,6 +32,7 @@ const { mockOpenChildWindow, mockShowItemInFolder, mockOpenPath, windows } = vi.
     mockOpenChildWindow,
     mockShowItemInFolder: vi.fn(),
     mockOpenPath: vi.fn(async () => ''),
+    mockIsSafeToOpen: vi.fn(async () => true),
     windows,
   };
 });
@@ -42,6 +43,10 @@ vi.mock('electron', () => ({
     showItemInFolder: mockShowItemInFolder,
     openPath: mockOpenPath,
   },
+}));
+
+vi.mock('../src/main/executableClassifier', () => ({
+  isSafeToOpen: mockIsSafeToOpen,
 }));
 
 vi.mock('../src/main/windows', () => ({
@@ -57,6 +62,8 @@ beforeEach(() => {
   mockShowItemInFolder.mockClear();
   mockOpenPath.mockClear();
   mockOpenPath.mockResolvedValue('');
+  mockIsSafeToOpen.mockClear();
+  mockIsSafeToOpen.mockResolvedValue(true);
 });
 
 describe('DownloadPromptQueue', () => {
@@ -138,6 +145,37 @@ describe('DownloadPromptQueue', () => {
     queue.enqueue({ filename: 'a.pdf', filePath: '/tmp/a.pdf', canOpen: true });
 
     await expect(queue.open('download-1')).rejects.toThrow('no application found');
+  });
+
+  it('keeps the prompt window open when opening fails, so the error stays visible', async () => {
+    mockOpenPath.mockResolvedValue('no application found');
+    const queue = makeQueue();
+    queue.enqueue({ filename: 'a.pdf', filePath: '/tmp/a.pdf', canOpen: true });
+
+    await expect(queue.open('download-1')).rejects.toThrow('no application found');
+
+    expect(windows[0].close).not.toHaveBeenCalled();
+  });
+
+  it('refuses to open a prompt whose file was classified unsafe at download time', async () => {
+    const queue = makeQueue();
+    queue.enqueue({ filename: 'a.sh', filePath: '/tmp/a.sh', canOpen: false });
+
+    await expect(queue.open('download-1')).rejects.toThrow('not safe to open');
+
+    expect(mockOpenPath).not.toHaveBeenCalled();
+    expect(windows[0].close).not.toHaveBeenCalled();
+  });
+
+  it('refuses to open a file that became unsafe after it was enqueued', async () => {
+    const queue = makeQueue();
+    queue.enqueue({ filename: 'a.pdf', filePath: '/tmp/a.pdf', canOpen: true });
+    mockIsSafeToOpen.mockResolvedValue(false);
+
+    await expect(queue.open('download-1')).rejects.toThrow('not safe to open');
+
+    expect(mockIsSafeToOpen).toHaveBeenCalledWith('/tmp/a.pdf');
+    expect(mockOpenPath).not.toHaveBeenCalled();
   });
 
   it('getInfo returns the info for a still-pending prompt', () => {
