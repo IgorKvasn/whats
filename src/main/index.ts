@@ -1,6 +1,12 @@
 import { app, BrowserWindow, ipcMain, shell, type DownloadItem, type IpcMainEvent } from 'electron';
 import path from 'node:path';
-import { loadSettings, saveSettings, shouldShowOnLaunch, type Settings } from './settings';
+import {
+  loadSettings,
+  normalizeSettings,
+  saveSettings,
+  shouldShowOnLaunch,
+  type Settings,
+} from './settings';
 import { currentBuildInfo } from './buildInfo';
 import {
   shouldDispatch,
@@ -9,7 +15,6 @@ import {
   removeCachedNotificationIcon,
   closeAllNotifications,
   isSafeExternalUrl,
-  type LastNotification,
 } from './notifications';
 import { createTray, updateTray, type TrayHandle } from './tray';
 import {
@@ -41,10 +46,10 @@ import { installDownloadObserver } from './downloads';
 import { notifyDownloadFailed } from './downloadNotifications';
 import { DownloadPromptQueue, registerDownloadPromptIpc } from './downloadPrompts';
 import { isSafeToOpen } from './executableClassifier';
+import { createWhatsappIpcHandlers, type NotifyPayload } from './whatsappIpc';
 
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settings: Settings = loadSettings(settingsPath);
-let lastNotification: LastNotification | null = null;
 let downloadPrompts: DownloadPromptQueue;
 let currentUpdate: UpdateInfo | null = null;
 let trayHandle: TrayHandle | null = null;
@@ -168,7 +173,11 @@ async function initialize(): Promise<void> {
   registerIpcHandlers(iconDir);
 
   if (settings.autoUpdateCheckEnabled) {
-    setTimeout(() => runStartupCheck(), 5000);
+    setTimeout(() => {
+      runStartupCheck().catch((err) => {
+        console.error('updater: startup check failed:', err);
+      });
+    }, 5000);
   }
 }
 
@@ -181,9 +190,13 @@ function registerIpcHandlers(iconDir: string): void {
     return settings;
   });
 
-  ipcMain.handle('settings:set', (_event, newSettings: Settings) => {
-    saveSettings(settingsPath, newSettings);
-    settings = newSettings;
+  ipcMain.handle('settings:set', (_event, newSettings: unknown) => {
+    // updateState is main-process-owned; the renderer's snapshot can be stale and would
+    // otherwise revert a concurrently recorded update check.
+    const normalized = normalizeSettings(newSettings, settings);
+    normalized.updateState = settings.updateState;
+    saveSettings(settingsPath, normalized);
+    settings = normalized;
   });
 
   ipcMain.handle('settings:preview-notification', () => {
@@ -223,62 +236,63 @@ function registerIpcHandlers(iconDir: string): void {
     autoReload?.reconnectNow();
   });
 
-  ipcMain.on('whatsapp:notify', async (
-    _event,
-    payload: { sender: string; body: string | null; icon?: string | null },
-  ) => {
-    if (!isTrustedWhatsappIpcEvent(_event)) return;
-
-    const { sender, body } = payload;
-    const senderTrunc = sender.slice(0, 200);
-    const bodyTrunc = body ? body.slice(0, 1000) : '';
-
-    if (!shouldShowIncomingNotification(settings, mainInForeground())) return;
-
-    const now = Date.now();
-    if (!shouldDispatch(lastNotification, now, senderTrunc, bodyTrunc, 1500)) return;
-
-    lastNotification = { time: now, sender: senderTrunc, body: bodyTrunc };
-
-    const bodyText = settings.includePreview ? bodyTrunc : '';
-    const senderIconPath = await resolveNotificationIconPath(
-      payload.icon,
-      notificationIconPath,
-      path.join(app.getPath('userData'), 'notification-icons'),
-    );
-    showNotification(
-      senderTrunc,
-      bodyText,
-      settings.soundEnabled,
-      notificationIconPath,
-      showMainWindow,
-      senderIconPath,
-      () => removeCachedNotificationIcon(senderIconPath, notificationIconPath),
-    );
+  const whatsappHandlers = createWhatsappIpcHandlers({
+    isTrustedEvent: isTrustedWhatsappIpcEvent,
+    getSettings: () => settings,
+    mainInForeground,
+    shouldShowIncomingNotification,
+    shouldDispatch,
+    now: () => Date.now(),
+    resolveNotificationIconPath: (icon) =>
+      resolveNotificationIconPath(
+        icon,
+        notificationIconPath,
+        path.join(app.getPath('userData'), 'notification-icons'),
+      ),
+    removeCachedNotificationIcon: (iconPath) => {
+      void removeCachedNotificationIcon(iconPath, notificationIconPath);
+    },
+    showNotification: ({ sender, body, sound, senderIconPath, onClosed }) => {
+      showNotification(
+        sender,
+        body,
+        sound,
+        notificationIconPath,
+        showMainWindow,
+        senderIconPath,
+        onClosed,
+      );
+    },
+    updateUnread: (count) => {
+      if (trayHandle) {
+        updateTray(trayHandle, iconDir, count, undefined);
+      }
+    },
+    updateDisconnected: (disconnected) => {
+      if (trayHandle) {
+        updateTray(trayHandle, iconDir, undefined, disconnected);
+      }
+    },
+    isSafeExternalUrl,
+    openExternal: (url) => {
+      void shell.openExternal(url);
+    },
   });
 
-  ipcMain.on('whatsapp:unread', (_event, count: number) => {
-    if (!isTrustedWhatsappIpcEvent(_event)) return;
-
-    if (trayHandle) {
-      updateTray(trayHandle, iconDir, count, undefined);
-    }
+  ipcMain.on('whatsapp:notify', (event, payload: NotifyPayload) => {
+    void whatsappHandlers.notify(event, payload);
   });
 
-  ipcMain.on('whatsapp:disconnected', (_event, disconnected: boolean) => {
-    if (!isTrustedWhatsappIpcEvent(_event)) return;
-
-    if (trayHandle) {
-      updateTray(trayHandle, iconDir, undefined, disconnected);
-    }
+  ipcMain.on('whatsapp:unread', (event, count: number) => {
+    whatsappHandlers.unread(event, count);
   });
 
-  ipcMain.on('shell:open-external', (_event, url: string) => {
-    if (!isTrustedWhatsappIpcEvent(_event)) return;
+  ipcMain.on('whatsapp:disconnected', (event, disconnected: boolean) => {
+    whatsappHandlers.disconnected(event, disconnected);
+  });
 
-    if (isSafeExternalUrl(url)) {
-      shell.openExternal(url);
-    }
+  ipcMain.on('shell:open-external', (event, url: string) => {
+    whatsappHandlers.openExternal(event, url);
   });
 }
 
