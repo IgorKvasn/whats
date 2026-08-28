@@ -27,11 +27,6 @@ export function showMainWindow(): void {
   repaintMainWindow();
 }
 
-export function hideMainWindow(): void {
-  if (!mainWindow) return;
-  mainWindow.hide();
-}
-
 export function toggleMainWindow(): void {
   if (!mainWindow) return;
   if (mainWindow.isVisible()) {

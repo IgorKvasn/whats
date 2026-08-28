@@ -7,6 +7,11 @@ interface NavigationEvent {
   preventDefault(): void;
 }
 
+interface FrameNavigationEvent extends NavigationEvent {
+  url: string;
+  isMainFrame: boolean;
+}
+
 interface WindowOpenDetails {
   url: string;
 }
@@ -15,6 +20,7 @@ type OpenExternal = (url: string) => void;
 
 type GuardedWebContents = Pick<WebContents, 'setWindowOpenHandler'> & {
   on(eventName: 'will-navigate' | 'will-redirect', handler: (event: NavigationEvent, url: string) => void): WebContents;
+  on(eventName: 'will-frame-navigate', handler: (event: FrameNavigationEvent) => void): WebContents;
 };
 
 export interface TrustedWhatsappEventInput {
@@ -41,6 +47,16 @@ export function installNavigationGuards(
     event.preventDefault();
     if (isSafeExternalUrl(navigationUrl)) {
       openExternal(navigationUrl);
+    }
+  });
+
+  webContents.on('will-frame-navigate', (event) => {
+    if (event.isMainFrame) return;
+    if (isAllowedWhatsappUrl(event.url)) return;
+
+    event.preventDefault();
+    if (isSafeExternalUrl(event.url)) {
+      openExternal(event.url);
     }
   });
 

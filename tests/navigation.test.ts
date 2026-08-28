@@ -22,10 +22,12 @@ describe('isAllowedWhatsappUrl', () => {
 });
 
 describe('installNavigationGuards', () => {
+  type NavigationListener = (event: Record<string, unknown> & { preventDefault: () => void }, url?: string) => void;
+
   function createWebContents() {
-    const listeners = new Map<string, (event: { preventDefault: () => void }, url: string) => void>();
+    const listeners = new Map<string, NavigationListener>();
     const webContents = {
-      on: vi.fn((eventName: string, handler: (event: { preventDefault: () => void }, url: string) => void) => {
+      on: vi.fn((eventName: string, handler: NavigationListener) => {
         listeners.set(eventName, handler);
       }),
       setWindowOpenHandler: vi.fn(),
@@ -52,6 +54,42 @@ describe('installNavigationGuards', () => {
 
     const event = { preventDefault: vi.fn() };
     listeners.get('will-navigate')!(event, 'https://web.whatsapp.com/');
+
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('blocks subframe navigation away from WhatsApp and opens safe URLs externally', () => {
+    const { webContents, listeners } = createWebContents();
+    const openExternal = vi.fn();
+    installNavigationGuards(webContents, openExternal);
+
+    const event = { preventDefault: vi.fn(), url: 'https://example.com/', isMainFrame: false };
+    listeners.get('will-frame-navigate')!(event);
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/');
+  });
+
+  it('allows subframe navigation within WhatsApp', () => {
+    const { webContents, listeners } = createWebContents();
+    const openExternal = vi.fn();
+    installNavigationGuards(webContents, openExternal);
+
+    const event = { preventDefault: vi.fn(), url: 'https://web.whatsapp.com/embed', isMainFrame: false };
+    listeners.get('will-frame-navigate')!(event);
+
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('leaves main-frame navigation to the will-navigate guard', () => {
+    const { webContents, listeners } = createWebContents();
+    const openExternal = vi.fn();
+    installNavigationGuards(webContents, openExternal);
+
+    const event = { preventDefault: vi.fn(), url: 'https://example.com/', isMainFrame: true };
+    listeners.get('will-frame-navigate')!(event);
 
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(openExternal).not.toHaveBeenCalled();
