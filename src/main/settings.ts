@@ -37,16 +37,68 @@ export function shouldShowOnLaunch(settings: Settings): boolean {
   return !settings.startMinimizedToTray;
 }
 
+export function defaultSettings(): Settings {
+  return { ...DEFAULT_SETTINGS, updateState: { ...DEFAULT_SETTINGS.updateState } };
+}
+
+type BooleanSettingKey = {
+  [K in keyof Settings]: Settings[K] extends boolean ? K : never;
+}[keyof Settings];
+
+function pickBoolean(
+  raw: Record<string, unknown>,
+  key: BooleanSettingKey,
+  fallback: boolean,
+): boolean {
+  return typeof raw[key] === 'boolean' ? (raw[key] as boolean) : fallback;
+}
+
+export function normalizeSettings(raw: unknown, base: Settings): Settings {
+  const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const updateStateRaw =
+    (obj.updateState && typeof obj.updateState === 'object'
+      ? (obj.updateState as Record<string, unknown>)
+      : {});
+
+  return {
+    notificationsEnabled: pickBoolean(obj, 'notificationsEnabled', base.notificationsEnabled),
+    soundEnabled: pickBoolean(obj, 'soundEnabled', base.soundEnabled),
+    includePreview: pickBoolean(obj, 'includePreview', base.includePreview),
+    autoUpdateCheckEnabled: pickBoolean(obj, 'autoUpdateCheckEnabled', base.autoUpdateCheckEnabled),
+    hardwareAccelerationEnabled: pickBoolean(
+      obj,
+      'hardwareAccelerationEnabled',
+      base.hardwareAccelerationEnabled,
+    ),
+    startMinimizedToTray: pickBoolean(obj, 'startMinimizedToTray', base.startMinimizedToTray),
+    downloadPromptEnabled: pickBoolean(obj, 'downloadPromptEnabled', base.downloadPromptEnabled),
+    updateState: {
+      lastCheckedAt:
+        typeof updateStateRaw.lastCheckedAt === 'number'
+          ? updateStateRaw.lastCheckedAt
+          : base.updateState.lastCheckedAt,
+      skippedVersion:
+        typeof updateStateRaw.skippedVersion === 'string'
+          ? updateStateRaw.skippedVersion
+          : base.updateState.skippedVersion,
+      consecutiveFailures:
+        typeof updateStateRaw.consecutiveFailures === 'number'
+          ? updateStateRaw.consecutiveFailures
+          : base.updateState.consecutiveFailures,
+    },
+  };
+}
+
 export function loadSettings(path: string): Settings {
   let raw: string;
   try {
     raw = readFileSync(path, 'utf-8');
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
-      return { ...DEFAULT_SETTINGS, updateState: { ...DEFAULT_SETTINGS.updateState } };
+      return defaultSettings();
     }
     console.error('settings: read failed, using defaults:', err);
-    return { ...DEFAULT_SETTINGS, updateState: { ...DEFAULT_SETTINGS.updateState } };
+    return defaultSettings();
   }
 
   let parsed: unknown;
@@ -54,56 +106,10 @@ export function loadSettings(path: string): Settings {
     parsed = JSON.parse(raw);
   } catch (err) {
     console.error('settings: corrupt file, using defaults:', err);
-    return { ...DEFAULT_SETTINGS, updateState: { ...DEFAULT_SETTINGS.updateState } };
+    return defaultSettings();
   }
 
-  const obj = parsed as Record<string, unknown>;
-  const updateStateRaw = (obj.updateState as Record<string, unknown>) ?? {};
-
-  return {
-    notificationsEnabled:
-      typeof obj.notificationsEnabled === 'boolean'
-        ? obj.notificationsEnabled
-        : DEFAULT_SETTINGS.notificationsEnabled,
-    soundEnabled:
-      typeof obj.soundEnabled === 'boolean'
-        ? obj.soundEnabled
-        : DEFAULT_SETTINGS.soundEnabled,
-    includePreview:
-      typeof obj.includePreview === 'boolean'
-        ? obj.includePreview
-        : DEFAULT_SETTINGS.includePreview,
-    autoUpdateCheckEnabled:
-      typeof obj.autoUpdateCheckEnabled === 'boolean'
-        ? obj.autoUpdateCheckEnabled
-        : DEFAULT_SETTINGS.autoUpdateCheckEnabled,
-    hardwareAccelerationEnabled:
-      typeof obj.hardwareAccelerationEnabled === 'boolean'
-        ? obj.hardwareAccelerationEnabled
-        : DEFAULT_SETTINGS.hardwareAccelerationEnabled,
-    startMinimizedToTray:
-      typeof obj.startMinimizedToTray === 'boolean'
-        ? obj.startMinimizedToTray
-        : DEFAULT_SETTINGS.startMinimizedToTray,
-    downloadPromptEnabled:
-      typeof obj.downloadPromptEnabled === 'boolean'
-        ? obj.downloadPromptEnabled
-        : DEFAULT_SETTINGS.downloadPromptEnabled,
-    updateState: {
-      lastCheckedAt:
-        typeof updateStateRaw.lastCheckedAt === 'number'
-          ? updateStateRaw.lastCheckedAt
-          : DEFAULT_SETTINGS.updateState.lastCheckedAt,
-      skippedVersion:
-        typeof updateStateRaw.skippedVersion === 'string'
-          ? updateStateRaw.skippedVersion
-          : DEFAULT_SETTINGS.updateState.skippedVersion,
-      consecutiveFailures:
-        typeof updateStateRaw.consecutiveFailures === 'number'
-          ? updateStateRaw.consecutiveFailures
-          : DEFAULT_SETTINGS.updateState.consecutiveFailures,
-    },
-  };
+  return normalizeSettings(parsed, DEFAULT_SETTINGS);
 }
 
 export function saveSettings(path: string, settings: Settings): void {

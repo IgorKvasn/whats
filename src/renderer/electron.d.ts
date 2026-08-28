@@ -3,6 +3,12 @@ export interface BuildInfo {
   buildTimestamp: string;
 }
 
+export interface UpdateState {
+  lastCheckedAt: number | null;
+  skippedVersion: string | null;
+  consecutiveFailures: number;
+}
+
 export interface Settings {
   notificationsEnabled: boolean;
   soundEnabled: boolean;
@@ -11,7 +17,7 @@ export interface Settings {
   hardwareAccelerationEnabled: boolean;
   startMinimizedToTray: boolean;
   downloadPromptEnabled: boolean;
-  updateState: unknown;
+  updateState: UpdateState;
 }
 
 export interface DownloadPromptInfo {
