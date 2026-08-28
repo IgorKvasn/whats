@@ -1,7 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   parseUnread,
-  makeNotificationShim,
   shouldNotifyFromUnreadDelta,
   pickFallbackNotificationPayload,
 } from '../src/preload/inject';
@@ -34,54 +33,6 @@ describe('parseUnread', () => {
   it('returns 0 for null/undefined', () => {
     expect(parseUnread(null as unknown as string)).toBe(0);
     expect(parseUnread(undefined as unknown as string)).toBe(0);
-  });
-});
-
-describe('notification shim', () => {
-  it('invokes notify_message with sender + body', () => {
-    const invoke = vi.fn();
-    const Shim = makeNotificationShim(invoke);
-    (Shim as unknown as Function)('Alice', { body: 'hi' });
-    expect(invoke).toHaveBeenCalledWith('notify_message', {
-      sender: 'Alice',
-      body: 'hi',
-      icon: null,
-    });
-  });
-
-  it('forwards notification icon as sender profile image', () => {
-    const invoke = vi.fn();
-    const Shim = makeNotificationShim(invoke);
-    (Shim as unknown as Function)('Alice', {
-      body: 'hi',
-      icon: 'https://example.test/alice.png',
-    });
-    expect(invoke).toHaveBeenCalledWith('notify_message', {
-      sender: 'Alice',
-      body: 'hi',
-      icon: 'https://example.test/alice.png',
-    });
-  });
-
-  it('passes null body when options omitted', () => {
-    const invoke = vi.fn();
-    const Shim = makeNotificationShim(invoke);
-    (Shim as unknown as Function)('Bob');
-    expect(invoke).toHaveBeenCalledWith('notify_message', {
-      sender: 'Bob',
-      body: null,
-      icon: null,
-    });
-  });
-
-  it('exposes permission as granted', () => {
-    const Shim = makeNotificationShim(() => {});
-    expect(Shim.permission).toBe('granted');
-  });
-
-  it('requestPermission resolves to granted', async () => {
-    const Shim = makeNotificationShim(() => {});
-    await expect(Shim.requestPermission()).resolves.toBe('granted');
   });
 });
 

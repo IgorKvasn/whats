@@ -51,79 +51,79 @@ function watchTitle(): void {
   pushTitle();
 }
 
-function installNotificationShim(): void {
-  const shimCode = `
-    (function() {
-      function pickNotificationIcon(options) {
-        if (!options) return null;
-        if (typeof options.icon === 'string' && options.icon) return options.icon;
-        if (typeof options.image === 'string' && options.image) return options.image;
-        if (typeof options.badge === 'string' && options.badge) return options.badge;
-        return null;
-      }
+export const NOTIFICATION_SHIM_SOURCE = `
+  (function() {
+    function pickNotificationIcon(options) {
+      if (!options) return null;
+      if (typeof options.icon === 'string' && options.icon) return options.icon;
+      if (typeof options.image === 'string' && options.image) return options.image;
+      if (typeof options.badge === 'string' && options.badge) return options.badge;
+      return null;
+    }
 
-      function ShimNotification(title, options) {
-        var body = options && typeof options.body === 'string' ? options.body : null;
-        window.postMessage({
-          type: '__whats_notify',
-          title: title,
-          body: body,
-          icon: pickNotificationIcon(options),
-        }, '*');
-        return { close: function() {} };
-      }
-      ShimNotification.permission = 'granted';
-      ShimNotification.requestPermission = function(cb) {
-        if (typeof cb === 'function') cb('granted');
-        return Promise.resolve('granted');
-      };
-      Object.defineProperty(window, 'Notification', {
-        configurable: true,
-        writable: true,
-        value: ShimNotification,
-      });
+    function ShimNotification(title, options) {
+      var body = options && typeof options.body === 'string' ? options.body : null;
+      window.postMessage({
+        type: '__whats_notify',
+        title: title,
+        body: body,
+        icon: pickNotificationIcon(options),
+      }, '*');
+      return { close: function() {} };
+    }
+    ShimNotification.permission = 'granted';
+    ShimNotification.requestPermission = function(cb) {
+      if (typeof cb === 'function') cb('granted');
+      return Promise.resolve('granted');
+    };
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      writable: true,
+      value: ShimNotification,
+    });
 
-      try {
-        var swc = navigator.serviceWorker;
-        if (swc) {
-          function wrapReg(reg) {
-            if (!reg || reg.__whatsPatched) return reg;
-            var orig = reg.showNotification ? reg.showNotification.bind(reg) : null;
-            reg.showNotification = function(title, options) {
-              var body = options && typeof options.body === 'string' ? options.body : null;
-              window.postMessage({
-                type: '__whats_notify',
-                title: title,
-                body: body,
-                icon: pickNotificationIcon(options),
-              }, '*');
-              if (orig) { try { return orig(title, options); } catch(_) {} }
-              return Promise.resolve();
-            };
-            reg.__whatsPatched = true;
-            return reg;
-          }
-          if (swc.getRegistration) {
-            var origGetReg = swc.getRegistration.bind(swc);
-            swc.getRegistration = function() { return origGetReg.apply(null, arguments).then(wrapReg); };
-          }
-          if (swc.getRegistrations) {
-            var origGetRegs = swc.getRegistrations.bind(swc);
-            swc.getRegistrations = function() { return origGetRegs.apply(null, arguments).then(function(r) { return r.map(wrapReg); }); };
-          }
-          if (swc.ready && typeof swc.ready.then === 'function') {
-            swc.ready.then(wrapReg).catch(function(){});
-          }
-          if (swc.register) {
-            var origRegister = swc.register.bind(swc);
-            swc.register = function() { return origRegister.apply(null, arguments).then(wrapReg); };
-          }
+    try {
+      var swc = navigator.serviceWorker;
+      if (swc) {
+        function wrapReg(reg) {
+          if (!reg || reg.__whatsPatched) return reg;
+          var orig = reg.showNotification ? reg.showNotification.bind(reg) : null;
+          reg.showNotification = function(title, options) {
+            var body = options && typeof options.body === 'string' ? options.body : null;
+            window.postMessage({
+              type: '__whats_notify',
+              title: title,
+              body: body,
+              icon: pickNotificationIcon(options),
+            }, '*');
+            if (orig) { try { return orig(title, options); } catch(_) {} }
+            return Promise.resolve();
+          };
+          reg.__whatsPatched = true;
+          return reg;
         }
-      } catch(e) {}
-    })();
-  `;
+        if (swc.getRegistration) {
+          var origGetReg = swc.getRegistration.bind(swc);
+          swc.getRegistration = function() { return origGetReg.apply(null, arguments).then(wrapReg); };
+        }
+        if (swc.getRegistrations) {
+          var origGetRegs = swc.getRegistrations.bind(swc);
+          swc.getRegistrations = function() { return origGetRegs.apply(null, arguments).then(function(r) { return r.map(wrapReg); }); };
+        }
+        if (swc.ready && typeof swc.ready.then === 'function') {
+          swc.ready.then(wrapReg).catch(function(){});
+        }
+        if (swc.register) {
+          var origRegister = swc.register.bind(swc);
+          swc.register = function() { return origRegister.apply(null, arguments).then(wrapReg); };
+        }
+      }
+    } catch(e) {}
+  })();
+`;
 
-  webFrame.executeJavaScript(shimCode);
+function installNotificationShim(): void {
+  webFrame.executeJavaScript(NOTIFICATION_SHIM_SOURCE);
 
   window.addEventListener('message', (event) => {
     if (event.data?.type === '__whats_notify') {

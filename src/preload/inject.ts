@@ -32,36 +32,6 @@ const NON_SENDER_LABELS: ReadonlySet<string> = new Set([
   'whatsapp',
 ]);
 
-type InvokeFn = (command: string, args: Record<string, unknown>) => void;
-
-export interface NotificationShim {
-  (title: string, options?: { body?: string; icon?: string; image?: string; badge?: string }): { close: () => void };
-  permission: string;
-  requestPermission: (cb?: (result: string) => void) => Promise<string>;
-}
-
-export function makeNotificationShim(invokeFn: InvokeFn): NotificationShim {
-  function Shim(
-    title: string,
-    options?: { body?: string; icon?: string; image?: string; badge?: string },
-  ): { close: () => void } {
-    const body = options && typeof options.body === 'string' ? options.body : null;
-    const icon =
-      (options && typeof options.icon === 'string' && options.icon) ||
-      (options && typeof options.image === 'string' && options.image) ||
-      (options && typeof options.badge === 'string' && options.badge) ||
-      null;
-    invokeFn('notify_message', { sender: String(title || ''), body, icon });
-    return { close() {} };
-  }
-  Shim.permission = 'granted';
-  Shim.requestPermission = function (cb?: (result: string) => void): Promise<string> {
-    if (typeof cb === 'function') cb('granted');
-    return Promise.resolve('granted');
-  };
-  return Shim as unknown as NotificationShim;
-}
-
 export interface UnreadDeltaDetails {
   previousUnread: number;
   nextUnread: number;
