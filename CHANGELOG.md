@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.18.1 — 2026-09-08
+
+### Bug Fixes
+
+- allow trusted whatsapp subframes and stop forwarding frame loads to the browser
+
+
 ## v1.18.0 — 2026-08-28
 
 ### Features
