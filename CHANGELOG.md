@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.18.2 — 2026-09-08
+
+### Bug Fixes
+
+- pin transitive dependencies to patched versions
+
+### CI
+
+- bump github/codeql-action in the github-actions group (#62)
+
+
 ## v1.18.1 — 2026-09-08
 
 ### Bug Fixes
