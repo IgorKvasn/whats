@@ -3,6 +3,10 @@ import { isSafeExternalUrl } from './notifications';
 
 export const WHATSAPP_ORIGIN = 'https://web.whatsapp.com';
 
+const TRUSTED_WHATSAPP_FRAME_HOSTS = ['web.whatsapp.com'] as const;
+
+const TRUSTED_WHATSAPP_FRAME_HOST_SUFFIXES = ['.whatsapp.com', '.whatsapp.net'] as const;
+
 interface NavigationEvent {
   preventDefault(): void;
 }
@@ -37,6 +41,21 @@ export function isAllowedWhatsappUrl(rawUrl: string): boolean {
   }
 }
 
+export function isTrustedWhatsappFrameUrl(rawUrl: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== 'https:') return false;
+
+  const host = url.hostname.toLowerCase().replace(/\.$/, '');
+  if (TRUSTED_WHATSAPP_FRAME_HOSTS.some((allowed) => host === allowed)) return true;
+  return TRUSTED_WHATSAPP_FRAME_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
 export function installNavigationGuards(
   webContents: GuardedWebContents,
   openExternal: OpenExternal,
@@ -52,12 +71,9 @@ export function installNavigationGuards(
 
   webContents.on('will-frame-navigate', (event) => {
     if (event.isMainFrame) return;
-    if (isAllowedWhatsappUrl(event.url)) return;
+    if (isTrustedWhatsappFrameUrl(event.url)) return;
 
     event.preventDefault();
-    if (isSafeExternalUrl(event.url)) {
-      openExternal(event.url);
-    }
   });
 
   webContents.on('will-redirect', (event, navigationUrl) => {

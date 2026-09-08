@@ -59,7 +59,7 @@ describe('installNavigationGuards', () => {
     expect(openExternal).not.toHaveBeenCalled();
   });
 
-  it('blocks subframe navigation away from WhatsApp and opens safe URLs externally', () => {
+  it('blocks subframe navigation away from WhatsApp silently, without opening the browser', () => {
     const { webContents, listeners } = createWebContents();
     const openExternal = vi.fn();
     installNavigationGuards(webContents, openExternal);
@@ -68,7 +68,7 @@ describe('installNavigationGuards', () => {
     listeners.get('will-frame-navigate')!(event);
 
     expect(event.preventDefault).toHaveBeenCalledOnce();
-    expect(openExternal).toHaveBeenCalledWith('https://example.com/');
+    expect(openExternal).not.toHaveBeenCalled();
   });
 
   it('allows subframe navigation within WhatsApp', () => {
@@ -80,6 +80,64 @@ describe('installNavigationGuards', () => {
     listeners.get('will-frame-navigate')!(event);
 
     expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('allows subframe navigation to the WhatsApp Flows cache management host', () => {
+    const { webContents, listeners } = createWebContents();
+    const openExternal = vi.fn();
+    installNavigationGuards(webContents, openExternal);
+
+    const event = {
+      preventDefault: vi.fn(),
+      url: 'https://flows.whatsapp.net/flows/cache_management/',
+      isMainFrame: false,
+    };
+    listeners.get('will-frame-navigate')!(event);
+
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('allows subframe navigation to other trusted WhatsApp hosts', () => {
+    const { webContents, listeners } = createWebContents();
+    const openExternal = vi.fn();
+    installNavigationGuards(webContents, openExternal);
+
+    const event = {
+      preventDefault: vi.fn(),
+      url: 'https://static.whatsapp.com/rsrc.php/some-asset.js',
+      isMainFrame: false,
+    };
+    listeners.get('will-frame-navigate')!(event);
+
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('blocks subframe navigation to look-alike or non-https WhatsApp hosts silently', () => {
+    const { webContents, listeners } = createWebContents();
+    const openExternal = vi.fn();
+    installNavigationGuards(webContents, openExternal);
+
+    const evilEvent = {
+      preventDefault: vi.fn(),
+      url: 'https://whatsapp.net.evil.example/',
+      isMainFrame: false,
+    };
+    listeners.get('will-frame-navigate')!(evilEvent);
+
+    expect(evilEvent.preventDefault).toHaveBeenCalledOnce();
+    expect(openExternal).not.toHaveBeenCalled();
+
+    const httpEvent = {
+      preventDefault: vi.fn(),
+      url: 'http://flows.whatsapp.net/',
+      isMainFrame: false,
+    };
+    listeners.get('will-frame-navigate')!(httpEvent);
+
+    expect(httpEvent.preventDefault).toHaveBeenCalledOnce();
     expect(openExternal).not.toHaveBeenCalled();
   });
 
