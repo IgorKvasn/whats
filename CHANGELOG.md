@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.18.3 — 2026-09-29
+
+### Bug Fixes
+
+- bump electron from 43.2.0 to 43.7.6 (#78)
+- let the main window close during app quit so sigterm at poweroff exits
+
+### Build
+
+- bump the production-minor-patch group across 1 directory with 2 updates (#80)
+- disable npm min-release-age cooldown
+
+### CI
+
+- bump github/codeql-action in the github-actions group (#82)
+- bump github/codeql-action in the github-actions group (#71)
+
+### Chores
+
+- bump electron from 43.7.6 to 44.4.5 (#81)
+- bump the dev-dependencies group with 2 updates (#79)
+- bump undici from 6.28.0 to 6.29.0 (#77)
+- bump @vitest/ui from 4.1.11 to 5.0.0 (#72)
+- bump eslint from 9.39.5 to 10.11.0 (#74)
+- bump js-yaml from 4.3.1 to 4.3.2 (#69)
+- bump the dev-dependencies group across 1 directory with 8 updates (#76)
+
+
 ## v1.18.2 — 2026-09-08
 
 ### Bug Fixes
