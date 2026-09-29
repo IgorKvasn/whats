@@ -65,7 +65,7 @@ If you build locally, the package is written to `dist/`.
 
 ## Prerequisites
 
-- Node.js 22.12.0
+- Node.js 22.23.3
 - `npm`
 - `dpkg-deb` for Linux package builds
 
