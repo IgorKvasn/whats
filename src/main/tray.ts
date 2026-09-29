@@ -85,3 +85,26 @@ export function updateTray(
     handle.state = newState;
   }
 }
+
+interface QuitSignal {
+  on(event: 'before-quit', listener: () => void): unknown;
+}
+
+interface HideableWindow {
+  on(event: 'close', listener: (event: { preventDefault(): void }) => void): unknown;
+  hide(): void;
+}
+
+// Once a quit is under way (tray Quit, SIGTERM at logout/poweroff), the close must go
+// through: preventing it cancels the quit and the process ignores the shutdown signal.
+export function installHideToTray(app: QuitSignal, window: HideableWindow): void {
+  let isQuitting = false;
+  app.on('before-quit', () => {
+    isQuitting = true;
+  });
+  window.on('close', (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    window.hide();
+  });
+}

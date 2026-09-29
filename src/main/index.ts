@@ -17,7 +17,7 @@ import {
   sweepNotificationIconCache,
   isSafeExternalUrl,
 } from './notifications';
-import { createTray, updateTray, type TrayHandle } from './tray';
+import { createTray, installHideToTray, updateTray, type TrayHandle } from './tray';
 import {
   decideUpdate,
   buildUpdateInfo,
@@ -165,12 +165,7 @@ async function initialize(): Promise<void> {
     onToggle: toggleMainWindow,
   });
 
-  mainWindow.on('close', (e) => {
-    if (trayHandle) {
-      e.preventDefault();
-      mainWindow.hide();
-    }
-  });
+  installHideToTray(app, mainWindow);
 
   registerIpcHandlers(iconDir);
 
