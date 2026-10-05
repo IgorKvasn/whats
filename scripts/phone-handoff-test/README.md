@@ -24,12 +24,12 @@ Phone (Pixel 9a, Android 16), all in MacroDroid:
 
 **Macro A: heartbeat receiver**
 
-- Local variables: `state` (String), `seq` (Integer). The webhook sets them by name; it does not create them.
+- Global variables (MacroDroid home → Variables): `state` (String), `seq` (Integer). The webhook sets them by name; it does not create them, and names are case-sensitive.
 - Trigger: Webhook (URL), identifier `handoff`. Leave the Variable Whitelist off for the test, or whitelist `state` and `seq`.
 - Actions:
-  1. Write to File → `Download/handoff-test/events.csv`, append: `{system_time_ms},{lv=state},{lv=seq}` followed by a newline.
-  2. If `{lv=state}` = `attended`: Stopwatch `heartbeat` → **Reset and Restart**.
-  3. If `{lv=state}` = `away`: Stopwatch `heartbeat` → **Stop and Reset**, and append `{system_time_ms},away-stop,{lv=seq}`.
+  1. Write to File → `Download/handoff-test/events.csv`, append: `{system_time_ms},{v=state},{v=seq}` followed by a newline.
+  2. If `{v=state}` = `attended`: Stopwatch `heartbeat` → **Reset and Restart**.
+  3. If `{v=state}` = `away`: Stopwatch `heartbeat` → **Stop and Reset**, and append `{system_time_ms},away-stop,{v=seq}`.
 
 **Macro B: timeout**
 
