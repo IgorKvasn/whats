@@ -29,12 +29,12 @@ Phone (Pixel 9a, Android 16), all in MacroDroid:
 - Actions:
   1. Write to File → `Download/handoff-test/events.csv`, append: `{system_time_ms},{v=state},{v=seq}` followed by a newline.
   2. If `{v=state}` = `attended`: Stopwatch `heartbeat` → **Reset and Restart**.
-  3. If `{v=state}` = `away`: Stopwatch `heartbeat` → **Stop and Reset**, and append `{system_time_ms},away-stop,{v=seq}`.
+  3. If `{v=state}` = `away`: Stopwatch `heartbeat` → **Pause**, then Stopwatch `heartbeat` → **Reset**, and append `{system_time_ms},away-stop,{v=seq}`.
 
 **Macro B: timeout**
 
 - Trigger: Stopwatch `heartbeat` at **180 s**, **Use alarm** on.
-- Action: Write to File append `{system_time_ms},timeout,`. Then Stopwatch `heartbeat` → Stop and Reset.
+- Action: Write to File append `{system_time_ms},timeout,`. Then Stopwatch `heartbeat` → **Pause**, then **Reset**.
 
 **Macro C: replay draft** (for the [#88](https://github.com/IgorKvasn/whats/issues/88) checks; enable only during step 5)
 
