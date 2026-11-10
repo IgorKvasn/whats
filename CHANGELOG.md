@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.18.4 — 2026-11-10
+
+### Bug Fixes
+
+- override minimatch to ^11.0.1 for GHSA-g3hv-75wg-m249 (#121)
+
+### Build
+
+- bump the production-minor-patch group across 1 directory with 3 updates (#120)
+
+### CI
+
+- bump the github-actions group with 2 updates (#109)
+
+### Chores
+
+- bump the dev-dependencies group across 1 directory with 9 updates (#118)
+- bump undici from 6.29.0 to 6.29.1 (#119)
+- bump fast-uri from 3.1.7 to 3.1.9 (#117)
+- bump electron from 44.4.5 to 44.9.1 (#115)
+- bump vite from 7.3.5 to 7.3.8 (#111)
+- bump source-map-js from 1.2.1 to 1.2.2 (#110)
+- bump brace-expansion from 1.1.18 to 1.1.21 (#108)
+
+
 ## v1.18.3 — 2026-09-29
 
 ### Bug Fixes
